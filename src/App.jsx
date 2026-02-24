@@ -147,11 +147,20 @@ function ChannelPill({ color, label }) {
   );
 }
 
+// ─── Node type badge config ───────────────────────────────────────────────────
+const NODE_TYPE_CONFIG = {
+  input:     { label:"Input Metric",  bg:"rgba(59,130,246,0.14)",  border:"rgba(59,130,246,0.38)",  color:"#93c5fd" },
+  influence: { label:"Influence-able", bg:"rgba(245,158,11,0.14)", border:"rgba(245,158,11,0.38)", color:"#fcd34d" },
+};
+
 // ─── Funnel column ────────────────────────────────────────────────────────────
-function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputValue }) {
+function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputValue, nodeTypes, onToggleType }) {
   return (
     <div style={{ flex:1, minWidth:180, maxWidth:280 }}>
-      {nodes.map((m, i) => (
+      {nodes.map((m, i) => {
+        const type = nodeTypes?.[m.id];
+        const badge = type ? NODE_TYPE_CONFIG[type] : null;
+        return (
         <div key={m.id}>
           {i > 0 && (
             <div style={{ height:20, display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -161,7 +170,7 @@ function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputV
               </div>
             </div>
           )}
-          <div style={{ border:"1px solid rgba(255,255,255,0.08)", borderRadius:9, padding:"11px 13px", background:"rgba(255,255,255,0.025)", position:"relative", overflow:"hidden" }}>
+          <div style={{ border:`1px solid ${badge ? badge.border : "rgba(255,255,255,0.08)"}`, borderRadius:9, padding:"11px 13px", background: badge ? badge.bg : "rgba(255,255,255,0.025)", position:"relative", overflow:"hidden", transition:"border-color 0.2s, background 0.2s" }}>
             <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, borderRadius:"3px 0 0 3px", background:m.color, opacity:0.65 }} />
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <div style={{ flex:1, minWidth:0 }}>
@@ -176,9 +185,27 @@ function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputV
                 <div style={{ width:6, height:6, borderRadius:"50%", background:m.color, boxShadow:`0 0 6px ${m.color}80`, flexShrink:0, marginLeft:6, marginTop:3 }} />
               )}
             </div>
+            {/* Type badge */}
+            <div style={{ marginTop:7, display:"flex", alignItems:"center", gap:5 }}>
+              <button
+                onClick={() => onToggleType(m.id)}
+                style={{
+                  display:"inline-flex", alignItems:"center", gap:4,
+                  background: badge ? badge.bg : "transparent",
+                  border: `1px ${badge ? "solid" : "dashed"} ${badge ? badge.border : "rgba(255,255,255,0.15)"}`,
+                  borderRadius:20, padding:"2px 8px", cursor:"pointer",
+                  color: badge ? badge.color : "rgba(255,255,255,0.22)",
+                  fontSize:9, fontWeight:600, fontFamily:"'DM Mono',monospace",
+                  letterSpacing:"0.06em", transition:"all 0.15s",
+                }}
+              >
+                {badge ? badge.label : "label…"}
+              </button>
+            </div>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {/* Output node */}
       <div style={{ height:20, display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -362,7 +389,17 @@ export default function ARRFlow() {
   const [ob, setOb] = useState(defaultOutbound);
   const [ip, setIp] = useState(defaultInPerson);
   const [pd, setPd] = useState(defaultPodcast);
+  const [nodeTypes, setNodeTypes] = useState({});
   const pageRef = useRef(null);
+
+  const handleToggleType = useCallback((id) => {
+    setNodeTypes(p => {
+      const cur = p[id];
+      const next = cur === undefined ? "input" : cur === "input" ? "influence" : undefined;
+      if (next === undefined) { const { [id]: _, ...rest } = p; return rest; }
+      return { ...p, [id]: next };
+    });
+  }, []);
 
   // Firestore scenarios
   const [scenarios, setScenarios] = useState([]);
@@ -378,13 +415,14 @@ export default function ARRFlow() {
   }, []);
 
   const handleSaveScenario = useCallback(async (name) => {
-    await addDoc(collection(db, "scenarios"), { name, ob, ip, pd, createdAt: serverTimestamp() });
-  }, [ob, ip, pd]);
+    await addDoc(collection(db, "scenarios"), { name, ob, ip, pd, nodeTypes, createdAt: serverTimestamp() });
+  }, [ob, ip, pd, nodeTypes]);
 
   const handleLoadScenario = useCallback((s) => {
     if (s.ob) setOb(s.ob);
     if (s.ip) setIp(s.ip);
     if (s.pd) setPd(s.pd);
+    setNodeTypes(s.nodeTypes ?? {});
     setMode("calculator");
   }, []);
 
@@ -472,11 +510,21 @@ export default function ARRFlow() {
           <div style={{ flex:1, minWidth:180, maxWidth:280 }}><ChannelPill color="#10b981" label="PODCAST" /></div>
         </div>
 
+        {/* Legend */}
+        <div style={{ display:"flex", gap:10, marginBottom:12, alignItems:"center" }}>
+          <span style={{ fontSize:9, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.08em", textTransform:"uppercase", marginRight:2 }}>Click a node to label it:</span>
+          {Object.entries(NODE_TYPE_CONFIG).map(([, cfg]) => (
+            <div key={cfg.label} style={{ display:"inline-flex", alignItems:"center", gap:4, background:cfg.bg, border:`1px solid ${cfg.border}`, borderRadius:20, padding:"2px 9px" }}>
+              <span style={{ fontSize:9, fontWeight:600, color:cfg.color, fontFamily:"'DM Mono',monospace", letterSpacing:"0.06em" }}>{cfg.label}</span>
+            </div>
+          ))}
+        </div>
+
         {/* Three funnels */}
         <div style={{ display:"flex", gap:20, width:"100%", maxWidth:960, justifyContent:"center", flexWrap:"wrap" }}>
-          <FunnelColumn nodes={outboundNodes} computed={cob} mode={mode} outputColor="#8b5cf6" outputLabel="Outbound ARR" outputValue={obArr} />
-          <FunnelColumn nodes={inPersonNodes} computed={cip} mode={mode} outputColor="#f59e0b" outputLabel="In-Person ARR" outputValue={ipArr} />
-          <FunnelColumn nodes={podcastNodes}  computed={cpd} mode={mode} outputColor="#10b981" outputLabel="Podcast ARR"   outputValue={pdArr} />
+          <FunnelColumn nodes={outboundNodes} computed={cob} mode={mode} outputColor="#8b5cf6" outputLabel="Outbound ARR" outputValue={obArr} nodeTypes={nodeTypes} onToggleType={handleToggleType} />
+          <FunnelColumn nodes={inPersonNodes} computed={cip} mode={mode} outputColor="#f59e0b" outputLabel="In-Person ARR" outputValue={ipArr} nodeTypes={nodeTypes} onToggleType={handleToggleType} />
+          <FunnelColumn nodes={podcastNodes}  computed={cpd} mode={mode} outputColor="#10b981" outputLabel="Podcast ARR"   outputValue={pdArr} nodeTypes={nodeTypes} onToggleType={handleToggleType} />
         </div>
 
         {/* Convergence + Combined */}
