@@ -5,4 +5,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/arr-flow/',
+  server: {
+    proxy: {
+      '/hubspot-api': {
+        target: 'https://api.hubapi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/hubspot-api/, ''),
+      },
+    },
+  },
 })

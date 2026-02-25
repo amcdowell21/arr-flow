@@ -4,6 +4,7 @@ import { db } from "./firebase";
 import {
   collection, addDoc, onSnapshot, deleteDoc, doc, serverTimestamp, query, orderBy,
 } from "firebase/firestore";
+import { fetchClosedDeals, closedArrForYear } from "./hubspot";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function formatCurrency(n) {
@@ -259,7 +260,7 @@ function SlidersPanel({ title, color, sections, values, onChange }) {
 }
 
 // ─── Scenario Sidebar ─────────────────────────────────────────────────────────
-function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave }) {
+function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -379,6 +380,66 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave }) {
           </div>
         ))}
       </div>
+
+      {/* HubSpot CRM */}
+      <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", padding:"16px" }}>
+        <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)", marginBottom:10, display:"flex", alignItems:"center", gap:6 }}>
+          <div style={{ width:5, height:5, borderRadius:"50%", background: hs.deals.length > 0 ? "#34d399" : "rgba(255,255,255,0.18)", transition:"background 0.3s" }} />
+          HubSpot CRM
+        </div>
+        <div style={{ fontSize:10, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace", marginBottom:8, lineHeight:1.5 }}>
+          Private App token
+        </div>
+        <div style={{ display:"flex", gap:6, marginBottom:8 }}>
+          <input
+            type="password"
+            value={hs.token}
+            onChange={e => hs.onTokenChange(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && hs.onSync()}
+            placeholder="pat-na1-…"
+            style={{
+              flex:1, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
+              borderRadius:7, padding:"6px 9px", fontSize:11, color:"#fff", outline:"none",
+              fontFamily:"'DM Mono',monospace",
+            }}
+          />
+          <button
+            onClick={hs.onSync}
+            disabled={!hs.token.trim() || hs.syncing}
+            style={{
+              background: hs.token.trim() ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${hs.token.trim() ? "rgba(52,211,153,0.4)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius:7, padding:"6px 10px",
+              cursor: hs.token.trim() && !hs.syncing ? "pointer" : "default",
+              color: hs.token.trim() ? "#6ee7b7" : "rgba(255,255,255,0.2)",
+              fontSize:11, fontWeight:600, fontFamily:"'DM Mono',monospace",
+              transition:"all 0.15s", flexShrink:0,
+            }}
+          >
+            {hs.syncing ? "…" : "Sync"}
+          </button>
+        </div>
+        {hs.error && (
+          <div style={{ fontSize:10, color:"#f87171", fontFamily:"'DM Mono',monospace", marginBottom:6, lineHeight:1.4 }}>
+            {hs.error}
+          </div>
+        )}
+        {hs.deals.length > 0 && (
+          <div style={{ fontSize:10, color:"#6ee7b7", fontFamily:"'DM Mono',monospace", marginBottom:4 }}>
+            {hs.deals.length} deals · {hs.closedArr >= 1e6 ? `$${(hs.closedArr/1e6).toFixed(2)}M` : hs.closedArr >= 1e3 ? `$${(hs.closedArr/1e3).toFixed(0)}k` : `$${Math.round(hs.closedArr)}`} closed YTD
+          </div>
+        )}
+        {hs.lastSync && !hs.error && (
+          <div style={{ fontSize:9, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>
+            Synced {hs.lastSync.toLocaleTimeString()}
+          </div>
+        )}
+        {!hs.token && (
+          <div style={{ fontSize:9, color:"rgba(255,255,255,0.14)", fontFamily:"'DM Mono',monospace", lineHeight:1.5, marginTop:4 }}>
+            Create token in HubSpot →<br/>Settings → Integrations →<br/>Private Apps (scope: deals.read)
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -389,6 +450,11 @@ export default function ARRFlow() {
   const [ob, setOb] = useState(defaultOutbound);
   const [ip, setIp] = useState(defaultInPerson);
   const [pd, setPd] = useState(defaultPodcast);
+  const [hsToken, setHsToken]     = useState(() => localStorage.getItem("hs_token") || "");
+  const [hsDeals, setHsDeals]     = useState([]);
+  const [hsSyncing, setHsSyncing] = useState(false);
+  const [hsError, setHsError]     = useState(null);
+  const [hsLastSync, setHsLastSync] = useState(null);
   const [nodeTypes, setNodeTypes] = useState({});
   const pageRef = useRef(null);
 
@@ -430,6 +496,37 @@ export default function ARRFlow() {
     await deleteDoc(doc(db, "scenarios", id));
   }, []);
 
+  const handleHsTokenChange = useCallback((t) => {
+    setHsToken(t);
+    localStorage.setItem("hs_token", t);
+  }, []);
+
+  const syncHubspot = useCallback(async () => {
+    if (!hsToken.trim()) return;
+    setHsSyncing(true);
+    setHsError(null);
+    try {
+      const deals = await fetchClosedDeals(hsToken.trim());
+      setHsDeals(deals);
+      setHsLastSync(new Date());
+    } catch (e) {
+      setHsError(e.message);
+    } finally {
+      setHsSyncing(false);
+    }
+  }, [hsToken]);
+
+  // Auto-sync on mount if a token was previously saved
+  useEffect(() => {
+    const token = localStorage.getItem("hs_token");
+    if (!token) return;
+    setHsSyncing(true);
+    fetchClosedDeals(token)
+      .then(deals => { setHsDeals(deals); setHsLastSync(new Date()); })
+      .catch(e => setHsError(e.message))
+      .finally(() => setHsSyncing(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDownload = useCallback(async () => {
     if (!pageRef.current) return;
     const canvas = await html2canvas(pageRef.current, { backgroundColor: "#09090e", scale: 2, useCORS: true });
@@ -458,6 +555,13 @@ export default function ARRFlow() {
   const handleIp = useCallback((k,v)=>setIp(p=>({...p,[k]:v})),[]);
   const handlePd = useCallback((k,v)=>setPd(p=>({...p,[k]:v})),[]);
 
+  const closedArr = closedArrForYear(hsDeals);
+  const hs = {
+    token: hsToken, onTokenChange: handleHsTokenChange,
+    syncing: hsSyncing, error: hsError, lastSync: hsLastSync,
+    deals: hsDeals, closedArr, onSync: syncHubspot,
+  };
+
   return (
     <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif", background:"#09090e", minHeight:"100vh", color:"#f0f0f5", display:"flex", flexDirection:"row" }}>
       <style>{`
@@ -482,6 +586,7 @@ export default function ARRFlow() {
         onLoad={handleLoadScenario}
         onDelete={handleDeleteScenario}
         onSave={handleSaveScenario}
+        hs={hs}
       />
 
       {/* Main content */}
@@ -570,6 +675,25 @@ export default function ARRFlow() {
               <div style={{ marginTop:16, borderRadius:4, overflow:"hidden", height:4, display:"flex", width:"100%" }}>
                 {channels.map(ch => (
                   <div key={ch.label} style={{ flex:ch.arr, background:ch.color, transition:"flex 0.3s ease" }} />
+                ))}
+              </div>
+            )}
+
+            {/* HubSpot: Closed YTD vs Projected */}
+            {mode === "calculator" && hsDeals.length > 0 && (
+              <div style={{ marginTop:18, paddingTop:14, borderTop:"1px solid rgba(255,255,255,0.07)", display:"flex", justifyContent:"center", gap:0 }}>
+                {[
+                  { label:"PROJECTED",  value:total,                          color:"#c4b5fd" },
+                  { label:"CLOSED YTD", value:closedArr,                      color:"#6ee7b7" },
+                  { label:"REMAINING",  value:Math.max(0, total - closedArr), color:"rgba(255,255,255,0.35)" },
+                ].map((item, i) => (
+                  <div key={item.label} style={{ display:"flex", alignItems:"stretch" }}>
+                    {i > 0 && <div style={{ width:1, background:"rgba(255,255,255,0.08)", margin:"0 14px" }} />}
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", marginBottom:3, letterSpacing:"0.07em" }}>{item.label}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:item.color, fontFamily:"'DM Mono',monospace" }}>{formatCurrency(item.value)}</div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
