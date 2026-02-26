@@ -4,7 +4,7 @@ import { db } from "./firebase";
 import {
   collection, addDoc, onSnapshot, deleteDoc, doc, serverTimestamp, query, orderBy,
 } from "firebase/firestore";
-import { fetchClosedDeals, closedArrForYear } from "./hubspot";
+import { fetchAllDeals, fetchPipelines, closedArrForYear } from "./hubspot";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function formatCurrency(n) {
@@ -264,6 +264,9 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [showHsInput, setShowHsInput] = useState(false);
+
+  const isConnected = hs.deals.length > 0;
 
   async function handleSave() {
     if (!name.trim()) return;
@@ -271,6 +274,11 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
     await onSave(name.trim());
     setName("");
     setSaving(false);
+  }
+
+  function handleHsSync() {
+    hs.onSync();
+    // Once synced, collapse the input if successful (handled by isConnected changing)
   }
 
   return (
@@ -284,7 +292,6 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
         <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)", marginBottom:10 }}>
           Saved Scenarios
         </div>
-        {/* Save input */}
         <div style={{ display:"flex", gap:6 }}>
           <input
             value={name}
@@ -313,7 +320,7 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
         </div>
       </div>
 
-      {/* List */}
+      {/* Scenario list */}
       <div style={{ flex:1, overflowY:"auto", padding:"10px 8px" }}>
         {loading && (
           <div style={{ textAlign:"center", padding:"20px 0", fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>
@@ -333,10 +340,7 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
               position:"relative",
             }}
           >
-            <div
-              onClick={() => onLoad(s)}
-              style={{ cursor:"pointer" }}
-            >
+            <div onClick={() => onLoad(s)} style={{ cursor:"pointer" }}>
               <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,0.85)", marginBottom:3, paddingRight:20 }}>
                 {s.name}
               </div>
@@ -352,7 +356,6 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
                 </div>
               )}
             </div>
-            {/* Delete button */}
             {confirmDelete === s.id ? (
               <div style={{ display:"flex", gap:4, marginTop:6 }}>
                 <button onClick={() => { onDelete(s.id); setConfirmDelete(null); }}
@@ -367,10 +370,7 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
             ) : (
               <button
                 onClick={e => { e.stopPropagation(); setConfirmDelete(s.id); }}
-                style={{
-                  position:"absolute", top:8, right:8, background:"transparent", border:"none",
-                  padding:2, cursor:"pointer", color:"rgba(255,255,255,0.18)", lineHeight:1,
-                }}
+                style={{ position:"absolute", top:8, right:8, background:"transparent", border:"none", padding:2, cursor:"pointer", color:"rgba(255,255,255,0.18)", lineHeight:1 }}
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -381,65 +381,337 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
         ))}
       </div>
 
-      {/* HubSpot CRM */}
-      <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", padding:"16px" }}>
-        <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)", marginBottom:10, display:"flex", alignItems:"center", gap:6 }}>
-          <div style={{ width:5, height:5, borderRadius:"50%", background: hs.deals.length > 0 ? "#34d399" : "rgba(255,255,255,0.18)", transition:"background 0.3s" }} />
-          HubSpot CRM
-        </div>
-        <div style={{ fontSize:10, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace", marginBottom:8, lineHeight:1.5 }}>
-          Private App token
-        </div>
-        <div style={{ display:"flex", gap:6, marginBottom:8 }}>
-          <input
-            type="password"
-            value={hs.token}
-            onChange={e => hs.onTokenChange(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && hs.onSync()}
-            placeholder="pat-na1-…"
-            style={{
-              flex:1, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
-              borderRadius:7, padding:"6px 9px", fontSize:11, color:"#fff", outline:"none",
-              fontFamily:"'DM Mono',monospace",
-            }}
-          />
-          <button
-            onClick={hs.onSync}
-            disabled={!hs.token.trim() || hs.syncing}
-            style={{
-              background: hs.token.trim() ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${hs.token.trim() ? "rgba(52,211,153,0.4)" : "rgba(255,255,255,0.08)"}`,
-              borderRadius:7, padding:"6px 10px",
-              cursor: hs.token.trim() && !hs.syncing ? "pointer" : "default",
-              color: hs.token.trim() ? "#6ee7b7" : "rgba(255,255,255,0.2)",
-              fontSize:11, fontWeight:600, fontFamily:"'DM Mono',monospace",
-              transition:"all 0.15s", flexShrink:0,
-            }}
-          >
-            {hs.syncing ? "…" : "Sync"}
-          </button>
-        </div>
-        {hs.error && (
-          <div style={{ fontSize:10, color:"#f87171", fontFamily:"'DM Mono',monospace", marginBottom:6, lineHeight:1.4 }}>
-            {hs.error}
+      {/* HubSpot button */}
+      <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", padding:"12px" }}>
+        {isConnected && !showHsInput ? (
+          /* Connected state: full-width button → navigates to HubSpot page */
+          <div style={{ display:"flex", gap:6 }}>
+            <button
+              onClick={hs.onOpenPage}
+              style={{
+                flex:1, display:"flex", alignItems:"center", gap:8,
+                background:"rgba(52,211,153,0.08)", border:"1px solid rgba(52,211,153,0.22)",
+                borderRadius:9, padding:"10px 12px", cursor:"pointer", transition:"background 0.15s",
+              }}
+            >
+              <div style={{ width:7, height:7, borderRadius:"50%", background:"#34d399", boxShadow:"0 0 6px rgba(52,211,153,0.7)", flexShrink:0 }} />
+              <div style={{ flex:1, textAlign:"left" }}>
+                <div style={{ fontSize:11, fontWeight:600, color:"#6ee7b7", fontFamily:"'DM Mono',monospace" }}>HubSpot CRM</div>
+                <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", marginTop:1 }}>
+                  {hs.syncing ? "Syncing…" : `${hs.deals.length} deals`}
+                </div>
+              </div>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, opacity:0.4 }}>
+                <path d="M3 1.5L7 5 3 8.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {/* Settings icon to re-enter token */}
+            <button
+              onClick={() => setShowHsInput(true)}
+              title="Change token"
+              style={{
+                background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
+                borderRadius:9, padding:"0 10px", cursor:"pointer", color:"rgba(255,255,255,0.25)",
+                transition:"all 0.15s",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.5 2.5l.7.7M8.8 8.8l.7.7M2.5 9.5l.7-.7M8.8 3.2l.7-.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              </svg>
+            </button>
           </div>
-        )}
-        {hs.deals.length > 0 && (
-          <div style={{ fontSize:10, color:"#6ee7b7", fontFamily:"'DM Mono',monospace", marginBottom:4 }}>
-            {hs.deals.length} deals · {hs.closedArr >= 1e6 ? `$${(hs.closedArr/1e6).toFixed(2)}M` : hs.closedArr >= 1e3 ? `$${(hs.closedArr/1e3).toFixed(0)}k` : `$${Math.round(hs.closedArr)}`} closed YTD
-          </div>
-        )}
-        {hs.lastSync && !hs.error && (
-          <div style={{ fontSize:9, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>
-            Synced {hs.lastSync.toLocaleTimeString()}
-          </div>
-        )}
-        {!hs.token && (
-          <div style={{ fontSize:9, color:"rgba(255,255,255,0.14)", fontFamily:"'DM Mono',monospace", lineHeight:1.5, marginTop:4 }}>
-            Create token in HubSpot →<br/>Settings → Integrations →<br/>Private Apps (scope: deals.read)
-          </div>
+        ) : (
+          /* Not connected or editing token */
+          <>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ width:6, height:6, borderRadius:"50%", background:"rgba(255,255,255,0.15)" }} />
+                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)" }}>
+                  HubSpot CRM
+                </span>
+              </div>
+              {isConnected && (
+                <button
+                  onClick={() => setShowHsInput(false)}
+                  style={{ background:"transparent", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.3)", padding:2, lineHeight:1 }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div style={{ display:"flex", gap:6, marginBottom:6 }}>
+              <input
+                type="password"
+                value={hs.token}
+                onChange={e => hs.onTokenChange(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleHsSync()}
+                placeholder="pat-na1-…"
+                style={{
+                  flex:1, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
+                  borderRadius:7, padding:"6px 9px", fontSize:11, color:"#fff", outline:"none",
+                  fontFamily:"'DM Mono',monospace",
+                }}
+              />
+              <button
+                onClick={handleHsSync}
+                disabled={!hs.token.trim() || hs.syncing}
+                style={{
+                  background: hs.token.trim() ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${hs.token.trim() ? "rgba(52,211,153,0.4)" : "rgba(255,255,255,0.08)"}`,
+                  borderRadius:7, padding:"6px 10px",
+                  cursor: hs.token.trim() && !hs.syncing ? "pointer" : "default",
+                  color: hs.token.trim() ? "#6ee7b7" : "rgba(255,255,255,0.2)",
+                  fontSize:11, fontWeight:600, fontFamily:"'DM Mono',monospace",
+                  transition:"all 0.15s", flexShrink:0,
+                }}
+              >
+                {hs.syncing ? "…" : "Sync"}
+              </button>
+            </div>
+            {hs.error && (
+              <div style={{ fontSize:10, color:"#f87171", fontFamily:"'DM Mono',monospace", marginBottom:5, lineHeight:1.4 }}>
+                {hs.error}
+              </div>
+            )}
+            {!hs.token && (
+              <div style={{ fontSize:9, color:"rgba(255,255,255,0.14)", fontFamily:"'DM Mono',monospace", lineHeight:1.6 }}>
+                Settings → Integrations →<br/>Private Apps · scope: deals.read
+              </div>
+            )}
+          </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── HubSpot Page ─────────────────────────────────────────────────────────────
+function HubSpotPage({ hs }) {
+  const { deals, pipelines, syncing, error, lastSync, closedArr } = hs;
+  const [activePipelineId, setActivePipelineId] = useState(null);
+  const [expandedStageId, setExpandedStageId] = useState(null);
+
+  useEffect(() => {
+    if (pipelines.length > 0 && !activePipelineId) {
+      setActivePipelineId(pipelines[0].id);
+    }
+  }, [pipelines, activePipelineId]);
+
+  const pipeline = pipelines.find(p => p.id === activePipelineId);
+  const pipelineDeals = deals.filter(d => d.properties?.pipeline === activePipelineId);
+
+  const openPipelineValue = deals
+    .filter(d => d.properties?.dealstage !== "closedlost" && d.properties?.dealstage !== "closedwon")
+    .reduce((sum, d) => sum + (parseFloat(d.properties?.amount) || 0), 0);
+
+  const sortedStages = (pipeline?.stages ?? []).slice().sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+
+  return (
+    <div style={{ flex:1, padding:"32px 32px 64px", minWidth:0, overflowY:"auto" }}>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+        <button
+          onClick={hs.onClosePage}
+          style={{
+            display:"flex", alignItems:"center", gap:6,
+            background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
+            borderRadius:8, padding:"7px 13px", cursor:"pointer", color:"rgba(255,255,255,0.5)",
+            fontSize:12, fontFamily:"'DM Mono',monospace", transition:"all 0.15s",
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M7 1.5L3 5 7 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Back
+        </button>
+
+        <div style={{ flex:1 }}>
+          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)", marginBottom:4 }}>
+            CRM Integration
+          </div>
+          <h1 style={{ fontSize:20, fontWeight:600, color:"#fff", letterSpacing:"-0.3px" }}>HubSpot Deals</h1>
+        </div>
+
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          {lastSync && !syncing && (
+            <span style={{ fontSize:9, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>
+              Synced {lastSync.toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={hs.onSync}
+            disabled={!hs.token.trim() || syncing}
+            style={{
+              display:"flex", alignItems:"center", gap:6,
+              background: syncing ? "rgba(255,255,255,0.04)" : "rgba(52,211,153,0.12)",
+              border:`1px solid ${syncing ? "rgba(255,255,255,0.08)" : "rgba(52,211,153,0.3)"}`,
+              borderRadius:8, padding:"7px 13px", cursor: syncing ? "default" : "pointer",
+              color: syncing ? "rgba(255,255,255,0.25)" : "#6ee7b7",
+              fontSize:12, fontWeight:600, fontFamily:"'DM Mono',monospace", transition:"all 0.15s",
+            }}
+          >
+            {syncing ? "Syncing…" : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div style={{ background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.25)", borderRadius:10, padding:"12px 16px", marginBottom:24, fontSize:12, color:"#fca5a5", fontFamily:"'DM Mono',monospace" }}>
+          {error}
+        </div>
+      )}
+
+      {/* Syncing empty state */}
+      {syncing && deals.length === 0 && (
+        <div style={{ textAlign:"center", padding:"80px 0", color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", fontSize:13 }}>
+          Fetching deals…
+        </div>
+      )}
+
+      {/* Summary cards */}
+      {deals.length > 0 && (
+        <div style={{ display:"flex", gap:14, marginBottom:32, flexWrap:"wrap" }}>
+          {[
+            { label:"Total Deals",      value: deals.length,       display: `${deals.length}`,                color:"#fff" },
+            { label:"Closed Won YTD",   value: closedArr,          display: formatCurrency(closedArr),        color:"#6ee7b7" },
+            { label:"Open Pipeline",    value: openPipelineValue,  display: formatCurrency(openPipelineValue),color:"#c4b5fd" },
+            { label:"Pipelines",        value: pipelines.length,   display: `${pipelines.length}`,            color:"#fcd34d" },
+          ].map(card => (
+            <div key={card.label} style={{
+              flex:1, minWidth:130,
+              background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)",
+              borderRadius:12, padding:"16px 18px",
+            }}>
+              <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:8 }}>
+                {card.label}
+              </div>
+              <div style={{ fontSize:22, fontWeight:700, color:card.color, fontFamily:"'DM Mono',monospace", letterSpacing:"-0.5px" }}>
+                {card.display}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pipeline tabs + stage table */}
+      {pipelines.length > 0 && (
+        <div>
+          {/* Pipeline tabs */}
+          <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
+            {pipelines.map(p => {
+              const pDeals = deals.filter(d => d.properties?.pipeline === p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { setActivePipelineId(p.id); setExpandedStageId(null); }}
+                  style={{
+                    display:"flex", alignItems:"center", gap:7,
+                    padding:"7px 14px", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer",
+                    background: activePipelineId === p.id ? "rgba(255,255,255,0.09)" : "transparent",
+                    border:`1px solid ${activePipelineId === p.id ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"}`,
+                    color: activePipelineId === p.id ? "#fff" : "rgba(255,255,255,0.38)",
+                    fontFamily:"'DM Sans',sans-serif", transition:"all 0.15s",
+                  }}
+                >
+                  {p.label}
+                  <span style={{ fontSize:10, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace" }}>
+                    {pDeals.length}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Stage table */}
+          {pipeline && (
+            <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
+              {/* Column headers */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 70px 130px 28px", padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.06)", background:"rgba(255,255,255,0.03)" }}>
+                {["Stage", "Deals", "Value", ""].map((h, i) => (
+                  <span key={h+i} style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", textAlign: i > 0 ? "right" : "left" }}>
+                    {h}
+                  </span>
+                ))}
+              </div>
+
+              {sortedStages.map(stage => {
+                const stageDeals = pipelineDeals.filter(d => d.properties?.dealstage === stage.id);
+                const stageValue = stageDeals.reduce((sum, d) => sum + (parseFloat(d.properties?.amount) || 0), 0);
+                const isExpanded = expandedStageId === stage.id;
+                const isClosedWon  = stage.id === "closedwon"  || stage.metadata?.probability === "1.0";
+                const isClosedLost = stage.id === "closedlost" || stage.metadata?.probability === "0.0";
+                const dotColor = isClosedWon ? "#34d399" : isClosedLost ? "#f87171" : "#818cf8";
+                const valueColor = isClosedWon ? "#6ee7b7" : "#c4b5fd";
+
+                return (
+                  <div key={stage.id}>
+                    <div
+                      onClick={() => stageDeals.length > 0 && setExpandedStageId(isExpanded ? null : stage.id)}
+                      style={{
+                        display:"grid", gridTemplateColumns:"1fr 70px 130px 28px",
+                        padding:"12px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)",
+                        cursor: stageDeals.length > 0 ? "pointer" : "default",
+                        background: isExpanded ? "rgba(255,255,255,0.035)" : "transparent",
+                        transition:"background 0.15s",
+                      }}
+                    >
+                      <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                        <div style={{ width:7, height:7, borderRadius:2, background:dotColor, flexShrink:0 }} />
+                        <span style={{ fontSize:12, color:"rgba(255,255,255,0.78)" }}>{stage.label}</span>
+                      </div>
+                      <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
+                        {stageDeals.length || "—"}
+                      </span>
+                      <span style={{ fontSize:12, fontWeight:600, color: stageValue > 0 ? valueColor : "rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
+                        {stageValue > 0 ? formatCurrency(stageValue) : "—"}
+                      </span>
+                      <span style={{ textAlign:"right", fontSize:9, color:"rgba(255,255,255,0.18)", paddingRight:2 }}>
+                        {stageDeals.length > 0 ? (isExpanded ? "▲" : "▼") : ""}
+                      </span>
+                    </div>
+
+                    {/* Expanded deals */}
+                    {isExpanded && stageDeals.map(deal => (
+                      <div key={deal.id} style={{
+                        display:"grid", gridTemplateColumns:"1fr 70px 130px 28px",
+                        padding:"8px 16px 8px 42px",
+                        borderBottom:"1px solid rgba(255,255,255,0.025)",
+                        background:"rgba(255,255,255,0.012)",
+                      }}>
+                        <span style={{ fontSize:11, color:"rgba(255,255,255,0.48)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {deal.properties?.dealname || "Untitled deal"}
+                        </span>
+                        <span />
+                        <span style={{ fontSize:11, color:"rgba(255,255,255,0.38)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
+                          {parseFloat(deal.properties?.amount) > 0 ? formatCurrency(parseFloat(deal.properties.amount)) : "—"}
+                        </span>
+                        <span />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* No data empty state */}
+      {!syncing && !error && deals.length === 0 && hs.token && (
+        <div style={{ textAlign:"center", padding:"80px 0", color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", fontSize:12, lineHeight:2 }}>
+          No deals found.<br/>Click Refresh to sync from HubSpot.
+        </div>
+      )}
+
+      {!hs.token && (
+        <div style={{ textAlign:"center", padding:"80px 0", color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", fontSize:12, lineHeight:2 }}>
+          Add your HubSpot token in the sidebar to get started.
+        </div>
+      )}
     </div>
   );
 }
@@ -450,11 +722,13 @@ export default function ARRFlow() {
   const [ob, setOb] = useState(defaultOutbound);
   const [ip, setIp] = useState(defaultInPerson);
   const [pd, setPd] = useState(defaultPodcast);
-  const [hsToken, setHsToken]     = useState(() => localStorage.getItem("hs_token") || "");
-  const [hsDeals, setHsDeals]     = useState([]);
-  const [hsSyncing, setHsSyncing] = useState(false);
-  const [hsError, setHsError]     = useState(null);
+  const [hsToken, setHsToken]       = useState(() => localStorage.getItem("hs_token") || "");
+  const [hsDeals, setHsDeals]       = useState([]);
+  const [hsPipelines, setHsPipelines] = useState([]);
+  const [hsSyncing, setHsSyncing]   = useState(false);
+  const [hsError, setHsError]       = useState(null);
   const [hsLastSync, setHsLastSync] = useState(null);
+  const [view, setView]             = useState("main");
   const [nodeTypes, setNodeTypes] = useState({});
   const pageRef = useRef(null);
 
@@ -506,8 +780,12 @@ export default function ARRFlow() {
     setHsSyncing(true);
     setHsError(null);
     try {
-      const deals = await fetchClosedDeals(hsToken.trim());
+      const [deals, pipelines] = await Promise.all([
+        fetchAllDeals(hsToken.trim()),
+        fetchPipelines(hsToken.trim()),
+      ]);
       setHsDeals(deals);
+      setHsPipelines(pipelines);
       setHsLastSync(new Date());
     } catch (e) {
       setHsError(e.message);
@@ -521,8 +799,12 @@ export default function ARRFlow() {
     const token = localStorage.getItem("hs_token");
     if (!token) return;
     setHsSyncing(true);
-    fetchClosedDeals(token)
-      .then(deals => { setHsDeals(deals); setHsLastSync(new Date()); })
+    Promise.all([fetchAllDeals(token), fetchPipelines(token)])
+      .then(([deals, pipelines]) => {
+        setHsDeals(deals);
+        setHsPipelines(pipelines);
+        setHsLastSync(new Date());
+      })
       .catch(e => setHsError(e.message))
       .finally(() => setHsSyncing(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -559,7 +841,10 @@ export default function ARRFlow() {
   const hs = {
     token: hsToken, onTokenChange: handleHsTokenChange,
     syncing: hsSyncing, error: hsError, lastSync: hsLastSync,
-    deals: hsDeals, closedArr, onSync: syncHubspot,
+    deals: hsDeals, pipelines: hsPipelines, closedArr, onSync: syncHubspot,
+    isActive: view === "hubspot",
+    onOpenPage: () => setView("hubspot"),
+    onClosePage: () => setView("main"),
   };
 
   return (
@@ -589,8 +874,11 @@ export default function ARRFlow() {
         hs={hs}
       />
 
+      {/* HubSpot page */}
+      {view === "hubspot" && <HubSpotPage hs={hs} />}
+
       {/* Main content */}
-      <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display:"flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
+      <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: view === "hubspot" ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
 
         {/* Header */}
         <div style={{ textAlign:"center", marginBottom:24 }}>

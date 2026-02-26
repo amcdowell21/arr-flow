@@ -6,47 +6,42 @@
 // HubSpot v3 allows CORS for private-app tokens on GET requests.
 //
 // To create a token: HubSpot → Settings → Integrations → Private Apps
-// Required scope: crm.objects.deals.read
+// Required scopes: crm.objects.deals.read, crm.schemas.deals.read
 
 // In dev the Vite proxy rewrites /hubspot-api/... → https://api.hubapi.com/...
 const HS_BASE = import.meta.env.DEV ? "/hubspot-api" : "https://api.hubapi.com";
 
+async function hsGet(token, path) {
+  const res = await fetch(`${HS_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `HubSpot error (${res.status})`);
+  }
+  return res.json();
+}
+
 /**
- * Fetch all Closed Won deals (paginates automatically).
- * Uses the GET /crm/v3/objects/deals endpoint with dealstage as a property
- * so we can filter client-side — avoids the POST search endpoint which has
- * stricter CORS preflight requirements in some browser/network configs.
+ * Fetch ALL deals (all stages, all pipelines), paginating automatically.
+ * Properties fetched: dealname, amount, closedate, dealstage, pipeline
  *
  * @param {string} token  HubSpot Private App token
- * @returns {Promise<Array>} raw deal objects (closedwon only)
+ * @returns {Promise<Array>} raw deal objects
  */
-export async function fetchClosedDeals(token) {
+export async function fetchAllDeals(token) {
   let allDeals = [];
   let after;
 
   do {
     const params = new URLSearchParams({
-      properties: "dealname,amount,closedate,dealstage",
+      properties: "dealname,amount,closedate,dealstage,pipeline",
       limit: 100,
     });
     if (after) params.set("after", after);
 
-    const res = await fetch(`${HS_BASE}/crm/v3/objects/deals?${params}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `HubSpot error (${res.status})`);
-    }
-
-    const data = await res.json();
-    const closedWon = data.results.filter(
-      (d) => d.properties?.dealstage === "closedwon"
-    );
-    allDeals = [...allDeals, ...closedWon];
+    const data = await hsGet(token, `/crm/v3/objects/deals?${params}`);
+    allDeals = [...allDeals, ...data.results];
     after = data.paging?.next?.after;
   } while (after);
 
@@ -54,13 +49,24 @@ export async function fetchClosedDeals(token) {
 }
 
 /**
- * Sum the `amount` property for deals closed in the given calendar year.
- * @param {Array}  deals  raw deal objects from fetchClosedDeals
+ * Fetch all deal pipelines and their stages.
+ * @param {string} token  HubSpot Private App token
+ * @returns {Promise<Array>} pipeline objects with .stages array
+ */
+export async function fetchPipelines(token) {
+  const data = await hsGet(token, "/crm/v3/pipelines/deals");
+  return data.results ?? [];
+}
+
+/**
+ * Sum the `amount` for closed-won deals in the given calendar year.
+ * @param {Array}  deals  raw deal objects from fetchAllDeals
  * @param {number} year   defaults to current year
  */
 export function closedArrForYear(deals, year = new Date().getFullYear()) {
   return deals
     .filter((d) => {
+      if (d.properties?.dealstage !== "closedwon") return false;
       const dt = d.properties?.closedate;
       return dt && new Date(dt).getFullYear() === year;
     })
