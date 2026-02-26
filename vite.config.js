@@ -4,7 +4,8 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/arr-flow/',
+  // Vercel serves from root; GitHub Pages serves from /arr-flow/
+  base: process.env.VERCEL ? '/' : '/arr-flow/',
   server: {
     proxy: {
       '/hubspot-api': {

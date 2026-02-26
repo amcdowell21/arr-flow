@@ -2,14 +2,15 @@
 // Uses a Private App token (stored in localStorage) to query the CRM v3 API.
 //
 // In development the Vite dev server proxies /hubspot-api → api.hubapi.com,
-// bypassing browser CORS restrictions.  In production the request goes direct;
-// HubSpot v3 allows CORS for private-app tokens on GET requests.
+// bypassing browser CORS restrictions.  In production a Vercel serverless
+// function at /api/hs/... proxies requests server-side.
 //
 // To create a token: HubSpot → Settings → Integrations → Private Apps
 // Required scopes: crm.objects.deals.read, crm.schemas.deals.read
 
-// In dev the Vite proxy rewrites /hubspot-api/... → https://api.hubapi.com/...
-const HS_BASE = import.meta.env.DEV ? "/hubspot-api" : "https://api.hubapi.com";
+// Dev: Vite proxy rewrites /hubspot-api/... → https://api.hubapi.com/...
+// Prod: Vercel function at /api/hs/... proxies server-side
+const HS_BASE = import.meta.env.DEV ? "/hubspot-api" : "/api/hs";
 
 async function hsGet(token, path) {
   const res = await fetch(`${HS_BASE}${path}`, {
