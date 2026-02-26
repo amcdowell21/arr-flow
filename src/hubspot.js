@@ -8,12 +8,17 @@
 // To create a token: HubSpot → Settings → Integrations → Private Apps
 // Required scopes: crm.objects.deals.read, crm.schemas.deals.read
 
-// Dev: Vite proxy rewrites /hubspot-api/... → https://api.hubapi.com/...
-// Prod: Vercel function at /api/hs/... proxies server-side
-const HS_BASE = import.meta.env.DEV ? "/hubspot-api" : "/api/hs";
-
 async function hsGet(token, path) {
-  const res = await fetch(`${HS_BASE}${path}`, {
+  // Dev: Vite proxy rewrites /hubspot-api/... → https://api.hubapi.com/...
+  // Prod: Vercel serverless function at /api/hubspot?_path=...
+  let url;
+  if (import.meta.env.DEV) {
+    url = `/hubspot-api${path}`;
+  } else {
+    const [pathOnly, qs] = path.split("?");
+    url = `/api/hubspot?_path=${encodeURIComponent(pathOnly)}${qs ? "&" + qs : ""}`;
+  }
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
