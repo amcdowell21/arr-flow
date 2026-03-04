@@ -5,6 +5,7 @@ import {
   collection, addDoc, onSnapshot, deleteDoc, doc, serverTimestamp, query, orderBy,
 } from "firebase/firestore";
 import { fetchAllDeals, fetchPipelines, closedArrForYear } from "./hubspot";
+import PipelinePage from "./PipelinePage";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function formatCurrency(n) {
@@ -260,7 +261,7 @@ function SlidersPanel({ title, color, sections, values, onChange }) {
 }
 
 // ─── Scenario Sidebar ─────────────────────────────────────────────────────────
-function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
+function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs, onOpenPipeline, pipelineActive }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -379,6 +380,31 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs }) {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Pipeline button */}
+      <div style={{ padding:"0 12px 6px" }}>
+        <button
+          onClick={onOpenPipeline}
+          style={{
+            width:"100%", display:"flex", alignItems:"center", gap:8,
+            background: pipelineActive ? "rgba(99,102,241,0.15)" : "rgba(255,255,255,0.03)",
+            border:`1px solid ${pipelineActive ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
+            borderRadius:9, padding:"10px 12px", cursor:"pointer", transition:"background 0.15s",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="1" y="7" width="2.5" height="4" rx="0.5" fill={pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
+            <rect x="4.75" y="4" width="2.5" height="7" rx="0.5" fill={pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
+            <rect x="8.5" y="1" width="2.5" height="10" rx="0.5" fill={pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
+          </svg>
+          <div style={{ flex:1, textAlign:"left" }}>
+            <div style={{ fontSize:11, fontWeight:600, color: pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.4)", fontFamily:"'DM Mono',monospace" }}>Pipeline</div>
+          </div>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, opacity:0.4 }}>
+            <path d="M3 1.5L7 5 3 8.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
       </div>
 
       {/* HubSpot button */}
@@ -872,13 +898,18 @@ export default function ARRFlow() {
         onDelete={handleDeleteScenario}
         onSave={handleSaveScenario}
         hs={hs}
+        onOpenPipeline={() => setView("pipeline")}
+        pipelineActive={view === "pipeline"}
       />
 
       {/* HubSpot page */}
       {view === "hubspot" && <HubSpotPage hs={hs} />}
 
+      {/* Pipeline page */}
+      {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} />}
+
       {/* Main content */}
-      <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: view === "hubspot" ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
+      <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: (view === "hubspot" || view === "pipeline") ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
 
         {/* Header */}
         <div style={{ textAlign:"center", marginBottom:24 }}>
