@@ -431,9 +431,15 @@ function DealRow({ deal, onUpdate, onDelete }) {
         <div style={{ fontWeight: 500 }}>{local.name || "Unnamed"}</div>
         <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
           {productMeta && (
-            <span style={{ fontSize: 10, background: productMeta.color + "22", color: productMeta.color, borderRadius: 3, padding: "1px 5px", border: `1px solid ${productMeta.color}44` }}>
-              {productMeta.label}
-            </span>
+            local.product === "uniqlearn" ? (
+              <img src="/uniqlearn-logo.png" alt="UniqLearn" style={{ height: 16, objectFit: "contain", borderRadius: 2, background: "#fff", padding: "1px 3px" }} />
+            ) : local.product === "uniqpath" ? (
+              <img src="/uniqpath-logo.png" alt="UniqPath" style={{ height: 16, objectFit: "contain", borderRadius: 2, background: "#fff", padding: "1px 3px" }} />
+            ) : (
+              <span style={{ fontSize: 10, background: productMeta.color + "22", color: productMeta.color, borderRadius: 3, padding: "1px 5px", border: `1px solid ${productMeta.color}44` }}>
+                {productMeta.label}
+              </span>
+            )
           )}
           {local.state && (
             <span style={{ fontSize: 10, color: "#64748b", padding: "1px 0" }}>{local.state}</span>
@@ -450,7 +456,6 @@ function DealRow({ deal, onUpdate, onDelete }) {
       <td style={{ ...cell, textAlign: "center" }}>
         <span style={{ color: confidenceColor, fontWeight: 600 }}>{effective}%</span>
         {local.useAlgoConfidence && <span style={{ fontSize: 10, color: "#818cf8", marginLeft: 4 }}>auto</span>}
-        {local.meetingBooked && <span style={{ fontSize: 11, marginLeft: 4, color: "#a5f3fc" }}>📅</span>}
       </td>
       <td style={{ ...cell, textAlign: "right", color: "#a5f3fc", fontWeight: 600 }}>{formatCurrency(adjustedValue)}</td>
       <td style={{ ...cell, textAlign: "center", color: "#64748b" }}>
