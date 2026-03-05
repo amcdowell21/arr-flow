@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import uniqlearnLogo from "./assets/uniqlearn-logo.png";
+import uniqlearnLogo from "./assets/uniqlearn-icon.png";
 import {
   collection, addDoc, onSnapshot, deleteDoc, doc,
   serverTimestamp, query, orderBy, updateDoc,
