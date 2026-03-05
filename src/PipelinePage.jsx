@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
+import uniqlearnLogo from "./assets/uniqlearn-logo.png";
 import {
   collection, addDoc, onSnapshot, deleteDoc, doc,
   serverTimestamp, query, orderBy, updateDoc,
@@ -432,9 +433,9 @@ function DealRow({ deal, onUpdate, onDelete }) {
         <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
           {productMeta && (
             local.product === "uniqlearn" ? (
-              <img src="/uniqlearn-logo.png" alt="UniqLearn" style={{ height: 16, objectFit: "contain", borderRadius: 2, background: "#fff", padding: "1px 3px" }} />
+              <img src={uniqlearnLogo} alt="UniqLearn" style={{ height: 20, objectFit: "contain" }} />
             ) : local.product === "uniqpath" ? (
-              <img src="/uniqpath-logo.png" alt="UniqPath" style={{ height: 16, objectFit: "contain", borderRadius: 2, background: "#fff", padding: "1px 3px" }} />
+              <span style={{ fontSize: 10, background: "#a855f722", color: "#a855f7", borderRadius: 3, padding: "1px 5px", border: "1px solid #a855f744" }}>UniqPath</span>
             ) : (
               <span style={{ fontSize: 10, background: productMeta.color + "22", color: productMeta.color, borderRadius: 3, padding: "1px 5px", border: `1px solid ${productMeta.color}44` }}>
                 {productMeta.label}
