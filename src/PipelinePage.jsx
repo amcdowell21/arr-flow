@@ -214,7 +214,7 @@ function getProductMeta(productId) {
 }
 
 // ─── DealRow ──────────────────────────────────────────────────────────────────
-function DealRow({ deal, onUpdate, onDelete }) {
+function DealRow({ deal, onUpdate, onDelete, events = [] }) {
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(deal);
 
@@ -294,6 +294,47 @@ function DealRow({ deal, onUpdate, onDelete }) {
                   {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+            </div>
+
+            {/* Row 0.5: funnel source */}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div>
+                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 4 }}>Funnel Source</label>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[["", "None"], ["outbound", "Outbound"], ["event", "Event"], ["podcast", "Podcast"]].map(([type, label]) => (
+                    <button
+                      key={type}
+                      onClick={() => setLocal(p => ({ ...p, funnelType: type, funnelEventId: type !== "event" ? "" : p.funnelEventId }))}
+                      style={{
+                        padding: "4px 11px", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer",
+                        background: local.funnelType === type
+                          ? (type === "outbound" ? "#b45309" : type === "event" ? "#0369a1" : type === "podcast" ? "#6d28d9" : "#6366f1")
+                          : "#334155",
+                        color: "#fff",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {local.funnelType === "event" && (
+                <div>
+                  <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Event</label>
+                  <select
+                    value={local.funnelEventId || ""}
+                    onChange={e => setLocal(p => ({ ...p, funnelEventId: e.target.value }))}
+                    style={{ ...inp, minWidth: 180 }}
+                  >
+                    <option value="">— Select event —</option>
+                    {[...events].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(ev => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.name}{ev.date ? ` (${ev.date})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Row 1: name / value / close month / bucket */}
@@ -380,6 +421,15 @@ function DealRow({ deal, onUpdate, onDelete }) {
                 />
               </div>
               <div>
+                <label style={{ fontSize: 11, color: "#4ade80", display: "block", marginBottom: 3, fontWeight: 600 }}>Officially Closed</label>
+                <input
+                  type="checkbox"
+                  checked={local.closedWon || false}
+                  onChange={e => setLocal(p => ({ ...p, closedWon: e.target.checked }))}
+                  style={{ transform: "scale(1.3)", cursor: "pointer", marginTop: 6, display: "block", accentColor: "#4ade80" }}
+                />
+              </div>
+              <div>
                 <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Touches</label>
                 <input
                   type="number" min={0}
@@ -425,12 +475,17 @@ function DealRow({ deal, onUpdate, onDelete }) {
   return (
     <tr
       onClick={() => setEditing(true)}
-      style={{ cursor: "pointer" }}
+      style={{ cursor: "pointer", opacity: local.closedWon ? 0.75 : 1 }}
       onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
     >
       <td style={cell}>
-        <div style={{ fontWeight: 500 }}>{local.name || "Unnamed"}</div>
+        <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+          {local.name || "Unnamed"}
+          {local.closedWon && (
+            <span style={{ fontSize: 10, background: "#14532d", color: "#4ade80", borderRadius: 3, padding: "1px 5px", border: "1px solid #166534", fontWeight: 700, letterSpacing: "0.04em" }}>WON</span>
+          )}
+        </div>
         <div style={{ display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" }}>
           {productMeta && (
             local.product === "uniqlearn" ? (
@@ -449,17 +504,35 @@ function DealRow({ deal, onUpdate, onDelete }) {
           {local.source === "hubspot" && (
             <span style={{ fontSize: 10, background: "#0369a1", color: "#bae6fd", borderRadius: 3, padding: "1px 5px" }}>HS</span>
           )}
+          {local.funnelType === "outbound" && (
+            <span style={{ fontSize: 10, background: "#78350f", color: "#fcd34d", borderRadius: 3, padding: "1px 5px", border: "1px solid #92400e" }}>Outbound</span>
+          )}
+          {local.funnelType === "event" && (
+            <span style={{ fontSize: 10, background: "#0c4a6e", color: "#7dd3fc", borderRadius: 3, padding: "1px 5px", border: "1px solid #0369a1" }}>
+              {events.find(e => e.id === local.funnelEventId)?.name || "Event"}
+            </span>
+          )}
+          {local.funnelType === "podcast" && (
+            <span style={{ fontSize: 10, background: "#3b0764", color: "#d8b4fe", borderRadius: 3, padding: "1px 5px", border: "1px solid #6d28d9" }}>Podcast</span>
+          )}
         </div>
         {local.contactName && (
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{local.contactName}</div>
         )}
       </td>
-      <td style={{ ...cell, textAlign: "right" }}>{formatCurrency(local.value)}</td>
+      <td style={{ ...cell, textAlign: "right", color: local.closedWon ? "#4ade80" : "#e2e8f0" }}>{formatCurrency(local.value)}</td>
       <td style={{ ...cell, textAlign: "center" }}>
-        <span style={{ color: confidenceColor, fontWeight: 600 }}>{effective}%</span>
-        {local.useAlgoConfidence && <span style={{ fontSize: 10, color: "#818cf8", marginLeft: 4 }}>auto</span>}
+        {local.closedWon
+          ? <span style={{ fontSize: 11, color: "#4ade80" }}>closed</span>
+          : <>
+              <span style={{ color: confidenceColor, fontWeight: 600 }}>{effective}%</span>
+              {local.useAlgoConfidence && <span style={{ fontSize: 10, color: "#818cf8", marginLeft: 4 }}>auto</span>}
+            </>
+        }
       </td>
-      <td style={{ ...cell, textAlign: "right", color: "#a5f3fc", fontWeight: 600 }}>{formatCurrency(adjustedValue)}</td>
+      <td style={{ ...cell, textAlign: "right", color: local.closedWon ? "#64748b" : "#a5f3fc", fontWeight: 600 }}>
+        {local.closedWon ? <span style={{ color: "#334155" }}>—</span> : formatCurrency(adjustedValue)}
+      </td>
       <td style={{ ...cell, textAlign: "center", color: "#64748b" }}>
         {local.touchCount > 0 ? local.touchCount : <span style={{ color: "#334155" }}>—</span>}
       </td>
@@ -882,7 +955,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
 }
 
 // ─── MonthByMonthDeals ────────────────────────────────────────────────────────
-function MonthByMonthDeals({ deals, onUpdate, onDelete }) {
+function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [] }) {
   const [collapsed, setCollapsed] = useState({});
 
   const now = new Date();
@@ -903,17 +976,19 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete }) {
   const sortedMonths = Object.keys(monthGroups).sort();
   const maxAdj = Math.max(
     ...sortedMonths.map(m =>
-      monthGroups[m].reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0)
+      monthGroups[m].filter(d => !d.closedWon).reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0)
     ),
-    unscheduled.reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0),
+    unscheduled.filter(d => !d.closedWon).reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0),
     1
   );
 
   const tblHdr = { padding: "6px 10px", fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
 
   function renderMonthSection(key, sectionDeals, label, isPast) {
-    const pipeline = sectionDeals.reduce((s, d) => s + (d.value || 0), 0);
-    const adjusted = sectionDeals.reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
+    const openDeals = sectionDeals.filter(d => !d.closedWon);
+    const pipeline = openDeals.reduce((s, d) => s + (d.value || 0), 0);
+    const adjusted = openDeals.reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
+    const closedTotal = sectionDeals.filter(d => d.closedWon).reduce((s, d) => s + (d.value || 0), 0);
     const barW = adjusted > 0 ? Math.round((adjusted / maxAdj) * 100) : 0;
     const isCurrentMonth = key === thisMonthKey;
     const isCollapsed = collapsed[key] ?? (isPast && key !== thisMonthKey);
@@ -947,6 +1022,9 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete }) {
             )}
           </div>
           <div style={{ display: "flex", gap: 24, fontSize: 13, flexShrink: 0 }}>
+            {closedTotal > 0 && (
+              <span style={{ color: "#4ade80", fontWeight: 600 }}>{formatCurrency(closedTotal)} closed</span>
+            )}
             <span style={{ color: "#64748b" }}>{pipeline > 0 ? formatCurrency(pipeline) : "—"}</span>
             <span style={{ color: isCurrentMonth ? "#a5b4fc" : "#a5f3fc", fontWeight: 600, minWidth: 60, textAlign: "right" }}>
               {adjusted > 0 ? formatCurrency(adjusted) : "—"}
@@ -973,7 +1051,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete }) {
               </thead>
               <tbody>
                 {sectionDeals.map(deal => (
-                  <DealRow key={deal.id} deal={deal} onUpdate={onUpdate} onDelete={onDelete} />
+                  <DealRow key={deal.id} deal={deal} onUpdate={onUpdate} onDelete={onDelete} events={events} />
                 ))}
               </tbody>
               <tfoot>
@@ -1015,17 +1093,19 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete }) {
 // ─── Events Section ───────────────────────────────────────────────────────────
 function EventsSection({ events, onAdd, onDelete }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", date: "", peopleMet: 0, convertedToMeeting: 0, notes: "" });
+  const [form, setForm] = useState({ name: "", date: "", peopleMet: 0, convertedToMeeting: 0, dealsWon: 0, dealValue: 0, notes: "" });
 
   function handleAdd() {
     if (!form.name.trim()) return;
     onAdd({ ...form });
-    setForm({ name: "", date: "", peopleMet: 0, convertedToMeeting: 0, notes: "" });
+    setForm({ name: "", date: "", peopleMet: 0, convertedToMeeting: 0, dealsWon: 0, dealValue: 0, notes: "" });
     setShowForm(false);
   }
 
   const totalMet = events.reduce((s, e) => s + (e.peopleMet || 0), 0);
   const totalConv = events.reduce((s, e) => s + (e.convertedToMeeting || 0), 0);
+  const totalDealsWon = events.reduce((s, e) => s + (e.dealsWon || 0), 0);
+  const totalDealValue = events.reduce((s, e) => s + (e.dealValue || 0), 0);
   const overallRate = totalMet > 0 ? ((totalConv / totalMet) * 100).toFixed(1) + "%" : "—";
 
   const inp = { background: "#0f172a", border: "1px solid #334155", borderRadius: 5, color: "#e2e8f0", padding: "5px 8px", fontSize: 13 };
@@ -1037,7 +1117,7 @@ function EventsSection({ events, onAdd, onDelete }) {
         <div>
           <h3 style={{ color: "#f1f5f9", margin: 0, fontSize: 15, fontWeight: 600 }}>Event Tracking</h3>
           <p style={{ color: "#64748b", fontSize: 12, margin: "4px 0 0" }}>
-            {events.length} events · {totalMet} contacts · {totalConv} → meeting · {overallRate} conv.
+            {events.length} events · {totalMet} contacts · {totalConv} → meeting · {overallRate} conv. · {totalDealsWon} deals closed · {formatCurrency(totalDealValue)}
           </p>
         </div>
         <button onClick={() => setShowForm(s => !s)} style={{ padding: "5px 14px", background: showForm ? "#334155" : "#6366f1", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}>
@@ -1065,6 +1145,14 @@ function EventsSection({ events, onAdd, onDelete }) {
               <input type="number" min={0} style={{ ...inp, width: 85 }} value={form.convertedToMeeting} onChange={e => setForm(p => ({ ...p, convertedToMeeting: parseInt(e.target.value) || 0 }))} />
             </div>
             <div>
+              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Deals Closed</label>
+              <input type="number" min={0} style={{ ...inp, width: 85 }} value={form.dealsWon} onChange={e => setForm(p => ({ ...p, dealsWon: parseInt(e.target.value) || 0 }))} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Deal Value ($)</label>
+              <input type="number" min={0} style={{ ...inp, width: 110 }} value={form.dealValue} onChange={e => setForm(p => ({ ...p, dealValue: parseFloat(e.target.value) || 0 }))} />
+            </div>
+            <div>
               <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Notes</label>
               <input style={{ ...inp, width: 180 }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
             </div>
@@ -1079,8 +1167,8 @@ function EventsSection({ events, onAdd, onDelete }) {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #334155" }}>
-              {["Event", "Date", "Met", "→ Mtg", "Conv%", "Notes", ""].map(h => (
-                <th key={h} style={{ ...hdr, textAlign: h === "Met" || h === "→ Mtg" || h === "Conv%" ? "center" : "left" }}>{h}</th>
+              {["Event", "Date", "Met", "→ Mtg", "Conv%", "Closed", "Value", "Notes", ""].map(h => (
+                <th key={h} style={{ ...hdr, textAlign: h === "Met" || h === "→ Mtg" || h === "Conv%" || h === "Closed" || h === "Value" ? "center" : "left" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -1097,6 +1185,8 @@ function EventsSection({ events, onAdd, onDelete }) {
                   <td style={{ padding: "8px 10px", color: "#e2e8f0", fontSize: 13, textAlign: "center" }}>{ev.peopleMet}</td>
                   <td style={{ padding: "8px 10px", color: "#a5f3fc", fontSize: 13, textAlign: "center" }}>{ev.convertedToMeeting}</td>
                   <td style={{ padding: "8px 10px", fontSize: 13, textAlign: "center", color: rateGood ? "#4ade80" : "#fbbf24" }}>{rate}</td>
+                  <td style={{ padding: "8px 10px", color: "#4ade80", fontSize: 13, textAlign: "center" }}>{ev.dealsWon || 0}</td>
+                  <td style={{ padding: "8px 10px", color: "#a5f3fc", fontSize: 13, textAlign: "center" }}>{ev.dealValue ? formatCurrency(ev.dealValue) : "—"}</td>
                   <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 12 }}>{ev.notes || "—"}</td>
                   <td style={{ padding: "8px 10px", textAlign: "right" }}>
                     <button onClick={() => onDelete(ev.id)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 16, lineHeight: 1 }} title="Delete">×</button>
@@ -1266,7 +1356,37 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
 
   async function updateDeal(id, data) {
     const { id: _id, ...rest } = data;
-    await updateDoc(doc(db, "pipelineDeals", id), { ...rest, updatedAt: serverTimestamp() });
+
+    // Sync event dealsWon / dealValue based on closedWon state changes
+    const prevDeal = deals.find(d => d.id === id);
+    const prevEventId = prevDeal?.funnelType === "event" && prevDeal?.closedWon ? prevDeal.funnelEventId : null;
+    const newEventId  = rest.funnelType === "event" && rest.closedWon ? rest.funnelEventId : null;
+
+    const deltas = {};
+    if (prevEventId) {
+      deltas[prevEventId] = { dealsWon: -1, dealValue: -(prevDeal.value || 0) };
+    }
+    if (newEventId) {
+      if (!deltas[newEventId]) deltas[newEventId] = { dealsWon: 0, dealValue: 0 };
+      deltas[newEventId].dealsWon  += 1;
+      deltas[newEventId].dealValue += (rest.value || 0);
+    }
+
+    const eventUpdates = Object.entries(deltas)
+      .filter(([, d]) => d.dealsWon !== 0 || d.dealValue !== 0)
+      .map(([eventId, delta]) => {
+        const ev = events.find(e => e.id === eventId);
+        if (!ev) return Promise.resolve();
+        return updateDoc(doc(db, "pipelineEvents", eventId), {
+          dealsWon:  Math.max(0, (ev.dealsWon  || 0) + delta.dealsWon),
+          dealValue: Math.max(0, (ev.dealValue || 0) + delta.dealValue),
+        });
+      });
+
+    await Promise.all([
+      updateDoc(doc(db, "pipelineDeals", id), { ...rest, updatedAt: serverTimestamp() }),
+      ...eventUpdates,
+    ]);
   }
 
   async function deleteDeal(id) {
@@ -1374,16 +1494,19 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
   }
 
   // ── Summary stats ──
-  const totalPipeline = deals.reduce((s, d) => s + (d.value || 0), 0);
-  const totalAdjusted = deals.reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
+  const openDeals = deals.filter(d => !d.closedWon);
+  const closedDeals = deals.filter(d => d.closedWon);
+  const totalPipeline = openDeals.reduce((s, d) => s + (d.value || 0), 0);
+  const totalAdjusted = openDeals.reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
+  const totalClosedWon = closedDeals.reduce((s, d) => s + (d.value || 0), 0);
   const now = new Date();
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const thisMonthAdj = deals
+  const thisMonthAdj = openDeals
     .filter(d => d.expectedCloseMonth === thisMonthKey)
     .reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
   const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const nextMonthKey = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, "0")}`;
-  const nextMonthAdj = deals
+  const nextMonthAdj = openDeals
     .filter(d => d.expectedCloseMonth === nextMonthKey)
     .reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
 
@@ -1431,13 +1554,13 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
       {/* Summary cards */}
       <div style={{ display: "flex", gap: 14, marginBottom: 24, flexWrap: "wrap" }}>
         {[
-          { label: "Total Deals",         value: deals.length,                    color: "#e2e8f0", sub: null },
-          { label: "Pipeline Value",       value: formatCurrency(totalPipeline),   color: "#e2e8f0", sub: null },
+          { label: "Closed Won",           value: totalClosedWon > 0 ? formatCurrency(totalClosedWon) : "—", color: "#4ade80", sub: `${closedDeals.length} deal${closedDeals.length !== 1 ? "s" : ""}`, border: "#166534" },
+          { label: "Pipeline Value",       value: formatCurrency(totalPipeline),   color: "#e2e8f0", sub: `${openDeals.length} open deals` },
           { label: "Confidence-Adjusted",  value: formatCurrency(totalAdjusted),   color: "#a5f3fc", sub: `${totalPipeline > 0 ? Math.round((totalAdjusted / totalPipeline) * 100) : 0}% of pipeline` },
-          { label: "This Month",           value: thisMonthAdj > 0 ? formatCurrency(thisMonthAdj) : "—", color: "#4ade80", sub: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }) },
+          { label: "This Month",           value: thisMonthAdj > 0 ? formatCurrency(thisMonthAdj) : "—", color: "#818cf8", sub: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }) },
           { label: "Next Month",           value: nextMonthAdj > 0 ? formatCurrency(nextMonthAdj) : "—", color: "#fbbf24", sub: nextMonthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }) },
         ].map(card => (
-          <div key={card.label} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "14px 20px", flex: "1 1 140px", minWidth: 130 }}>
+          <div key={card.label} style={{ background: "#1e293b", border: `1px solid ${card.border || "#334155"}`, borderRadius: 10, padding: "14px 20px", flex: "1 1 140px", minWidth: 130 }}>
             <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>{card.label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: card.color }}>{card.value}</div>
             {card.sub && <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{card.sub}</div>}
@@ -1446,7 +1569,7 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
       </div>
 
       {/* Month-by-month deal view */}
-      <MonthByMonthDeals deals={deals} onUpdate={updateDeal} onDelete={deleteDeal} />
+      <MonthByMonthDeals deals={deals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} />
 
       {/* Event tracking */}
       <EventsSection events={events} onAdd={addEvent} onDelete={deleteEvent} />
