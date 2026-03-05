@@ -260,14 +260,19 @@ function SlidersPanel({ title, color, sections, values, onChange }) {
   );
 }
 
-// ─── Scenario Sidebar ─────────────────────────────────────────────────────────
-function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs, onOpenPipeline, pipelineActive }) {
+// ─── App Sidebar ──────────────────────────────────────────────────────────────
+function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, onSave, hs }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [showHsInput, setShowHsInput] = useState(false);
+  const [scenariosOpen, setScenariosOpen] = useState(view === "main");
 
   const isConnected = hs.deals.length > 0;
+
+  useEffect(() => {
+    if (view === "main") setScenariosOpen(true);
+  }, [view]);
 
   async function handleSave() {
     if (!name.trim()) return;
@@ -277,170 +282,191 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs, onO
     setSaving(false);
   }
 
-  function handleHsSync() {
-    hs.onSync();
-    // Once synced, collapse the input if successful (handled by isConnected changing)
-  }
+  const navItems = [
+    {
+      id: "pipeline",
+      label: "Pipeline Tracker",
+      color: "#6366f1",
+      icon: (active) => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="8" width="3" height="5" rx="0.6" fill={active ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
+          <rect x="5.5" y="5" width="3" height="8" rx="0.6" fill={active ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
+          <rect x="10" y="1" width="3" height="12" rx="0.6" fill={active ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
+        </svg>
+      ),
+    },
+    {
+      id: "main",
+      label: "Input Metrics",
+      color: "#8b5cf6",
+      hasDropdown: true,
+      icon: (active) => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 4h10M2 7h7M2 10h4" stroke={active ? "#c4b5fd" : "rgba(255,255,255,0.3)"} strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      ),
+    },
+    {
+      id: "hubspot",
+      label: "HubSpot View",
+      color: "#10b981",
+      icon: (active) => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="5.5" stroke={active ? "#6ee7b7" : "rgba(255,255,255,0.3)"} strokeWidth="1.4"/>
+          <circle cx="7" cy="7" r="2" fill={active ? "#6ee7b7" : "rgba(255,255,255,0.3)"}/>
+        </svg>
+      ),
+    },
+  ];
 
   return (
     <div style={{
       width: 220, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.07)",
       background: "rgba(255,255,255,0.015)", display: "flex", flexDirection: "column",
-      minHeight: "100vh", padding: "28px 0 0",
+      minHeight: "100vh",
     }}>
-      {/* Header */}
-      <div style={{ padding: "0 16px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-        <div style={{ fontFamily:"'DM Mono',monospace", fontSize:9, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)", marginBottom:10 }}>
-          Saved Scenarios
+      {/* App header / home link */}
+      <button
+        onClick={() => onNavigate("home")}
+        style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "18px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)",
+          background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.07)",
+          cursor: "pointer", width: "100%", textAlign: "left",
+        }}
+      >
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 12V6L7 2l5 4v6H9V9H5v3H2z" stroke="white" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
+          </svg>
         </div>
-        <div style={{ display:"flex", gap:6 }}>
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSave()}
-            placeholder="Scenario name…"
-            style={{
-              flex:1, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
-              borderRadius:7, padding:"6px 9px", fontSize:11, color:"#fff", outline:"none",
-              fontFamily:"'DM Sans',sans-serif",
-            }}
-          />
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || saving}
-            style={{
-              background: name.trim() ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${name.trim() ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.08)"}`,
-              borderRadius:7, padding:"6px 9px", cursor: name.trim() ? "pointer" : "default",
-              color: name.trim() ? "#a5b4fc" : "rgba(255,255,255,0.2)", fontSize:11, fontWeight:600,
-              fontFamily:"'DM Mono',monospace", transition:"all 0.15s",
-            }}
-          >
-            {saving ? "…" : "Save"}
-          </button>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", lineHeight: 1.2 }}>ARR Flow</div>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono',monospace", letterSpacing: "0.08em" }}>Revenue Intelligence</div>
         </div>
-      </div>
+      </button>
 
-      {/* Scenario list */}
-      <div style={{ flex:1, overflowY:"auto", padding:"10px 8px" }}>
-        {loading && (
-          <div style={{ textAlign:"center", padding:"20px 0", fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>
-            Loading…
-          </div>
-        )}
-        {!loading && scenarios.length === 0 && (
-          <div style={{ textAlign:"center", padding:"20px 8px", fontSize:11, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace", lineHeight:1.6 }}>
-            No scenarios yet.<br/>Save one above.
-          </div>
-        )}
-        {scenarios.map(s => (
-          <div key={s.id}
-            style={{
-              borderRadius:8, padding:"9px 10px", marginBottom:4,
-              background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)",
-              position:"relative",
-            }}
-          >
-            <div onClick={() => onLoad(s)} style={{ cursor:"pointer" }}>
-              <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,0.85)", marginBottom:3, paddingRight:20 }}>
-                {s.name}
-              </div>
-              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:"#6ee7b7", marginBottom:2 }}>
-                {formatCurrency((s.ob && s.ip && s.pd)
-                  ? (computeOutbound(s.ob).weeklyArr + computeInPerson(s.ip).weeklyArr + computePodcast(s.pd).weeklyArr) * 52
-                  : 0
-                )}<span style={{ color:"rgba(255,255,255,0.2)", fontSize:9 }}> ARR</span>
-              </div>
-              {s.createdAt && (
-                <div style={{ fontSize:9, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>
-                  {new Date(s.createdAt.seconds * 1000).toLocaleDateString()}
+      {/* Nav items */}
+      <div style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
+        <div style={{ fontSize: 9, fontFamily: "'DM Mono',monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", padding: "6px 8px 8px" }}>
+          Workspace
+        </div>
+        {navItems.map(item => {
+          const active = view === item.id;
+          return (
+            <div key={item.id}>
+              <button
+                onClick={() => {
+                  onNavigate(item.id);
+                  if (item.hasDropdown) setScenariosOpen(s => view === item.id ? !s : true);
+                }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 9,
+                  background: active ? `${item.color}18` : "transparent",
+                  border: `1px solid ${active ? `${item.color}35` : "transparent"}`,
+                  borderRadius: 8, padding: "9px 10px", cursor: "pointer", transition: "all 0.15s",
+                  marginBottom: 2,
+                }}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}}
+                onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}}
+              >
+                {item.icon(active)}
+                <span style={{ fontSize: 12, fontWeight: 500, color: active ? "#fff" : "rgba(255,255,255,0.45)", flex: 1, textAlign: "left" }}>
+                  {item.label}
+                </span>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0, opacity: 0.3, transition: "transform 0.2s", transform: (item.hasDropdown && active && scenariosOpen) ? "rotate(90deg)" : "none" }}>
+                  <path d="M3 1.5L7 5 3 8.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+
+              {/* Scenarios dropdown under Input Metrics */}
+              {item.hasDropdown && active && scenariosOpen && (
+                <div style={{ marginLeft: 8, marginBottom: 6, paddingLeft: 10, borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
+                  {/* Save input */}
+                  <div style={{ padding: "8px 4px 6px", display: "flex", gap: 5 }}>
+                    <input
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleSave()}
+                      placeholder="Save scenario…"
+                      style={{
+                        flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 6, padding: "5px 8px", fontSize: 10, color: "#fff", outline: "none",
+                        fontFamily: "'DM Sans',sans-serif",
+                      }}
+                    />
+                    <button
+                      onClick={handleSave}
+                      disabled={!name.trim() || saving}
+                      style={{
+                        background: name.trim() ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${name.trim() ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.07)"}`,
+                        borderRadius: 6, padding: "5px 8px", cursor: name.trim() ? "pointer" : "default",
+                        color: name.trim() ? "#a5b4fc" : "rgba(255,255,255,0.18)", fontSize: 10, fontWeight: 600,
+                        fontFamily: "'DM Mono',monospace", transition: "all 0.15s", flexShrink: 0,
+                      }}
+                    >{saving ? "…" : "Save"}</button>
+                  </div>
+
+                  {/* Scenario list */}
+                  {loading && (
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontFamily: "'DM Mono',monospace", padding: "6px 4px" }}>Loading…</div>
+                  )}
+                  {!loading && scenarios.length === 0 && (
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.18)", fontFamily: "'DM Mono',monospace", padding: "6px 4px", lineHeight: 1.5 }}>No scenarios yet.</div>
+                  )}
+                  {scenarios.map(s => (
+                    <div key={s.id} style={{ borderRadius: 7, padding: "7px 8px", marginBottom: 3, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", position: "relative" }}>
+                      <div onClick={() => onLoad(s)} style={{ cursor: "pointer", paddingRight: 18 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.8)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: "#6ee7b7" }}>
+                          {formatCurrency((s.ob && s.ip && s.pd)
+                            ? (computeOutbound(s.ob).weeklyArr + computeInPerson(s.ip).weeklyArr + computePodcast(s.pd).weeklyArr) * 52
+                            : 0
+                          )} ARR
+                        </div>
+                      </div>
+                      {confirmDelete === s.id ? (
+                        <div style={{ display: "flex", gap: 3, marginTop: 5 }}>
+                          <button onClick={() => { onDelete(s.id); setConfirmDelete(null); }}
+                            style={{ flex: 1, background: "rgba(239,68,68,0.18)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 4, padding: "2px 0", fontSize: 9, color: "#fca5a5", cursor: "pointer", fontFamily: "'DM Mono',monospace" }}>
+                            Delete
+                          </button>
+                          <button onClick={() => setConfirmDelete(null)}
+                            style={{ flex: 1, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 0", fontSize: 9, color: "rgba(255,255,255,0.35)", cursor: "pointer", fontFamily: "'DM Mono',monospace" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={e => { e.stopPropagation(); setConfirmDelete(s.id); }}
+                          style={{ position: "absolute", top: 6, right: 6, background: "transparent", border: "none", padding: 2, cursor: "pointer", color: "rgba(255,255,255,0.15)", lineHeight: 1 }}
+                        >
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-            {confirmDelete === s.id ? (
-              <div style={{ display:"flex", gap:4, marginTop:6 }}>
-                <button onClick={() => { onDelete(s.id); setConfirmDelete(null); }}
-                  style={{ flex:1, background:"rgba(239,68,68,0.2)", border:"1px solid rgba(239,68,68,0.4)", borderRadius:5, padding:"3px 0", fontSize:10, color:"#fca5a5", cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>
-                  Delete
-                </button>
-                <button onClick={() => setConfirmDelete(null)}
-                  style={{ flex:1, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:5, padding:"3px 0", fontSize:10, color:"rgba(255,255,255,0.4)", cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={e => { e.stopPropagation(); setConfirmDelete(s.id); }}
-                style={{ position:"absolute", top:8, right:8, background:"transparent", border:"none", padding:2, cursor:"pointer", color:"rgba(255,255,255,0.18)", lineHeight:1 }}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Pipeline button */}
-      <div style={{ padding:"0 12px 6px" }}>
-        <button
-          onClick={onOpenPipeline}
-          style={{
-            width:"100%", display:"flex", alignItems:"center", gap:8,
-            background: pipelineActive ? "rgba(99,102,241,0.15)" : "rgba(255,255,255,0.03)",
-            border:`1px solid ${pipelineActive ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
-            borderRadius:9, padding:"10px 12px", cursor:"pointer", transition:"background 0.15s",
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <rect x="1" y="7" width="2.5" height="4" rx="0.5" fill={pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
-            <rect x="4.75" y="4" width="2.5" height="7" rx="0.5" fill={pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
-            <rect x="8.5" y="1" width="2.5" height="10" rx="0.5" fill={pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
-          </svg>
-          <div style={{ flex:1, textAlign:"left" }}>
-            <div style={{ fontSize:11, fontWeight:600, color: pipelineActive ? "#a5b4fc" : "rgba(255,255,255,0.4)", fontFamily:"'DM Mono',monospace" }}>Pipeline</div>
-          </div>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, opacity:0.4 }}>
-            <path d="M3 1.5L7 5 3 8.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-      </div>
-
-      {/* HubSpot button */}
-      <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", padding:"12px" }}>
+      {/* HubSpot token at bottom */}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "12px" }}>
         {isConnected && !showHsInput ? (
-          /* Connected state: full-width button → navigates to HubSpot page */
-          <div style={{ display:"flex", gap:6 }}>
-            <button
-              onClick={hs.onOpenPage}
-              style={{
-                flex:1, display:"flex", alignItems:"center", gap:8,
-                background:"rgba(52,211,153,0.08)", border:"1px solid rgba(52,211,153,0.22)",
-                borderRadius:9, padding:"10px 12px", cursor:"pointer", transition:"background 0.15s",
-              }}
-            >
-              <div style={{ width:7, height:7, borderRadius:"50%", background:"#34d399", boxShadow:"0 0 6px rgba(52,211,153,0.7)", flexShrink:0 }} />
-              <div style={{ flex:1, textAlign:"left" }}>
-                <div style={{ fontSize:11, fontWeight:600, color:"#6ee7b7", fontFamily:"'DM Mono',monospace" }}>HubSpot CRM</div>
-                <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", marginTop:1 }}>
-                  {hs.syncing ? "Syncing…" : `${hs.deals.length} deals`}
-                </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 2px" }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 5px rgba(52,211,153,0.6)", flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#6ee7b7", fontFamily: "'DM Mono',monospace" }}>HubSpot Connected</div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", fontFamily: "'DM Mono',monospace" }}>
+                {hs.syncing ? "Syncing…" : `${hs.deals.length} deals`}
               </div>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, opacity:0.4 }}>
-                <path d="M3 1.5L7 5 3 8.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            {/* Settings icon to re-enter token */}
-            <button
-              onClick={() => setShowHsInput(true)}
-              title="Change token"
-              style={{
-                background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)",
-                borderRadius:9, padding:"0 10px", cursor:"pointer", color:"rgba(255,255,255,0.25)",
-                transition:"all 0.15s",
-              }}
-            >
+            </div>
+            <button onClick={() => setShowHsInput(true)} title="Change token"
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: 2, lineHeight: 1 }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.5 2.5l.7.7M8.8 8.8l.7.7M2.5 9.5l.7-.7M8.8 3.2l.7-.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                 <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
@@ -448,67 +474,137 @@ function ScenarioSidebar({ scenarios, loading, onLoad, onDelete, onSave, hs, onO
             </button>
           </div>
         ) : (
-          /* Not connected or editing token */
           <>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <div style={{ width:6, height:6, borderRadius:"50%", background:"rgba(255,255,255,0.15)" }} />
-                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)" }}>
-                  HubSpot CRM
-                </span>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)" }}>HubSpot Token</span>
               {isConnected && (
-                <button
-                  onClick={() => setShowHsInput(false)}
-                  style={{ background:"transparent", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.3)", padding:2, lineHeight:1 }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
+                <button onClick={() => setShowHsInput(false)}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.3)", padding: 2, lineHeight: 1 }}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                 </button>
               )}
             </div>
-            <div style={{ display:"flex", gap:6, marginBottom:6 }}>
+            <div style={{ display: "flex", gap: 5 }}>
               <input
                 type="password"
                 value={hs.token}
                 onChange={e => hs.onTokenChange(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleHsSync()}
+                onKeyDown={e => e.key === "Enter" && hs.onSync()}
                 placeholder="pat-na1-…"
                 style={{
-                  flex:1, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
-                  borderRadius:7, padding:"6px 9px", fontSize:11, color:"#fff", outline:"none",
-                  fontFamily:"'DM Mono',monospace",
+                  flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
+                  borderRadius: 6, padding: "5px 8px", fontSize: 10, color: "#fff", outline: "none",
+                  fontFamily: "'DM Mono',monospace",
                 }}
               />
               <button
-                onClick={handleHsSync}
+                onClick={hs.onSync}
                 disabled={!hs.token.trim() || hs.syncing}
                 style={{
-                  background: hs.token.trim() ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${hs.token.trim() ? "rgba(52,211,153,0.4)" : "rgba(255,255,255,0.08)"}`,
-                  borderRadius:7, padding:"6px 10px",
+                  background: hs.token.trim() ? "rgba(52,211,153,0.16)" : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${hs.token.trim() ? "rgba(52,211,153,0.38)" : "rgba(255,255,255,0.07)"}`,
+                  borderRadius: 6, padding: "5px 9px",
                   cursor: hs.token.trim() && !hs.syncing ? "pointer" : "default",
-                  color: hs.token.trim() ? "#6ee7b7" : "rgba(255,255,255,0.2)",
-                  fontSize:11, fontWeight:600, fontFamily:"'DM Mono',monospace",
-                  transition:"all 0.15s", flexShrink:0,
+                  color: hs.token.trim() ? "#6ee7b7" : "rgba(255,255,255,0.18)",
+                  fontSize: 10, fontWeight: 600, fontFamily: "'DM Mono',monospace", transition: "all 0.15s", flexShrink: 0,
                 }}
-              >
-                {hs.syncing ? "…" : "Sync"}
-              </button>
+              >{hs.syncing ? "…" : "Sync"}</button>
             </div>
-            {hs.error && (
-              <div style={{ fontSize:10, color:"#f87171", fontFamily:"'DM Mono',monospace", marginBottom:5, lineHeight:1.4 }}>
-                {hs.error}
-              </div>
-            )}
-            {!hs.token && (
-              <div style={{ fontSize:9, color:"rgba(255,255,255,0.14)", fontFamily:"'DM Mono',monospace", lineHeight:1.6 }}>
-                Settings → Integrations →<br/>Private Apps · scope: deals.read
-              </div>
-            )}
+            {hs.error && <div style={{ fontSize: 9, color: "#f87171", fontFamily: "'DM Mono',monospace", marginTop: 4, lineHeight: 1.4 }}>{hs.error}</div>}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Home Page ────────────────────────────────────────────────────────────────
+function HomePage({ onNavigate }) {
+  const tiles = [
+    {
+      id: "pipeline",
+      title: "Pipeline Tracker",
+      desc: "Manage deals, assign buckets, and project close months with confidence scoring.",
+      color: "#6366f1",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect x="2" y="18" width="7" height="12" rx="1.5" fill="#6366f1" opacity="0.7"/>
+          <rect x="12.5" y="11" width="7" height="19" rx="1.5" fill="#6366f1"/>
+          <rect x="23" y="2" width="7" height="28" rx="1.5" fill="#6366f1" opacity="0.5"/>
+        </svg>
+      ),
+    },
+    {
+      id: "main",
+      title: "Input Metrics",
+      desc: "Model revenue funnel inputs across Outbound, In-Person, and Podcast channels.",
+      color: "#8b5cf6",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <path d="M4 9h24M4 16h17M4 23h10" stroke="#8b5cf6" strokeWidth="2.8" strokeLinecap="round"/>
+        </svg>
+      ),
+    },
+    {
+      id: "hubspot",
+      title: "HubSpot View",
+      desc: "Browse and sync your CRM deal pipeline, stages, and closed ARR year-to-date.",
+      color: "#10b981",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="12.5" stroke="#10b981" strokeWidth="2.2"/>
+          <circle cx="16" cy="16" r="5" fill="#10b981" opacity="0.75"/>
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 32px", minWidth: 0 }}>
+      <div style={{ textAlign: "center", marginBottom: 52 }}>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: "0.15em", color: "rgba(255,255,255,0.18)", textTransform: "uppercase", marginBottom: 12 }}>
+          Working Backwards · New Logo ARR
+        </div>
+        <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.5px", color: "#fff", marginBottom: 10 }}>Revenue Intelligence</h1>
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.28)", maxWidth: 380, lineHeight: 1.65, margin: "0 auto" }}>
+          Choose a workspace to get started.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 860 }}>
+        {tiles.map(tile => (
+          <button
+            key={tile.id}
+            onClick={() => onNavigate(tile.id)}
+            style={{
+              width: 250, textAlign: "left", background: "rgba(255,255,255,0.025)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 16, padding: "28px 24px", cursor: "pointer", transition: "all 0.18s",
+              position: "relative", overflow: "hidden",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = `${tile.color}12`;
+              e.currentTarget.style.borderColor = `${tile.color}40`;
+              e.currentTarget.style.transform = "translateY(-3px)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.025)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, borderRadius: "16px 16px 0 0", background: tile.color, opacity: 0.55 }} />
+            <div style={{ marginBottom: 18 }}>{tile.icon}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 8 }}>{tile.title}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.32)", lineHeight: 1.65 }}>{tile.desc}</div>
+            <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ fontSize: 11, color: tile.color, fontFamily: "'DM Mono',monospace", fontWeight: 500 }}>Open</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5h6M5.5 2L9 5l-3.5 3" stroke={tile.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -754,7 +850,7 @@ export default function ARRFlow() {
   const [hsSyncing, setHsSyncing]   = useState(false);
   const [hsError, setHsError]       = useState(null);
   const [hsLastSync, setHsLastSync] = useState(null);
-  const [view, setView]             = useState("main");
+  const [view, setView]             = useState("home");
   const [nodeTypes, setNodeTypes] = useState({});
   const pageRef = useRef(null);
 
@@ -868,9 +964,7 @@ export default function ARRFlow() {
     token: hsToken, onTokenChange: handleHsTokenChange,
     syncing: hsSyncing, error: hsError, lastSync: hsLastSync,
     deals: hsDeals, pipelines: hsPipelines, closedArr, onSync: syncHubspot,
-    isActive: view === "hubspot",
-    onOpenPage: () => setView("hubspot"),
-    onClosePage: () => setView("main"),
+    onClosePage: () => setView("home"),
   };
 
   return (
@@ -891,16 +985,19 @@ export default function ARRFlow() {
       `}</style>
 
       {/* Sidebar */}
-      <ScenarioSidebar
+      <AppSidebar
+        view={view}
+        onNavigate={setView}
         scenarios={scenarios}
         loading={scenariosLoading}
         onLoad={handleLoadScenario}
         onDelete={handleDeleteScenario}
         onSave={handleSaveScenario}
         hs={hs}
-        onOpenPipeline={() => setView("pipeline")}
-        pipelineActive={view === "pipeline"}
       />
+
+      {/* Home page */}
+      {view === "home" && <HomePage onNavigate={setView} />}
 
       {/* HubSpot page */}
       {view === "hubspot" && <HubSpotPage hs={hs} />}
@@ -908,8 +1005,8 @@ export default function ARRFlow() {
       {/* Pipeline page */}
       {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} />}
 
-      {/* Main content */}
-      <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: (view === "hubspot" || view === "pipeline") ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
+      {/* Input Metrics (main) content */}
+      <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: (view !== "main") ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
 
         {/* Header */}
         <div style={{ textAlign:"center", marginBottom:24 }}>
