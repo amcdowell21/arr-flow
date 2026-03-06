@@ -353,11 +353,7 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
           cursor: "pointer", width: "100%", textAlign: "left",
         }}
       >
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 12V6L7 2l5 4v6H9V9H5v3H2z" stroke="white" strokeWidth="1.3" strokeLinejoin="round" fill="none"/>
-          </svg>
-        </div>
+        <img src="/arr-flow-logo.png" alt="ARR Flow" style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", lineHeight: 1.2 }}>ARR Flow</div>
           <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono',monospace", letterSpacing: "0.08em" }}>Revenue Intelligence</div>
