@@ -197,7 +197,7 @@ function validateEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-export default function LoginPage() {
+export default function LoginPage({ onLoginSuccess }) {
   const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -234,6 +234,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      onLoginSuccess?.();
       // Auth state change in App.jsx will handle redirect
     } catch (err) {
       setError(friendlyError(err.code));
@@ -301,6 +302,7 @@ export default function LoginPage() {
           uid: cred.user.uid,
         }, { merge: true });
       }
+      onLoginSuccess?.();
       // Auth state change in App.jsx will handle redirect
     } catch (err) {
       setError(friendlyError(err.code));

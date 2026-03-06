@@ -875,6 +875,149 @@ function HubSpotPage({ hs }) {
   );
 }
 
+// ─── Login Animation ─────────────────────────────────────────────────────────
+function LoginAnimation({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2800);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#09090e", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif" }}>
+      <style>{`
+        @keyframes laOverlay { 0%{opacity:0} 8%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
+        @keyframes laBrain {
+          0%   { transform: translateY(-90px) rotate(0deg) scale(1.1); opacity: 0; }
+          6%   { opacity: 1; }
+          50%  { transform: translateY(72px) rotate(660deg) scale(0.42); opacity: 1; }
+          62%  { transform: translateY(118px) rotate(840deg) scale(0.06); opacity: 0.4; }
+          66%, 100% { transform: translateY(125px) rotate(900deg) scale(0); opacity: 0; }
+        }
+        @keyframes laFunnelGlow { 0%,100%{opacity:0.5} 50%{opacity:0.9} }
+        @keyframes laMoney1 {
+          0%,58%{transform:translate(0,0) scale(0) rotate(0deg);opacity:0}
+          63%{transform:translate(-10px,-8px) scale(1.3) rotate(-10deg);opacity:1}
+          100%{transform:translate(-100px,90px) scale(0.9) rotate(-25deg);opacity:0}
+        }
+        @keyframes laMoney2 {
+          0%,61%{transform:translate(0,0) scale(0) rotate(0deg);opacity:0}
+          66%{transform:translate(8px,-6px) scale(1.3) rotate(12deg);opacity:1}
+          100%{transform:translate(95px,80px) scale(0.9) rotate(28deg);opacity:0}
+        }
+        @keyframes laMoney3 {
+          0%,64%{transform:translate(0,0) scale(0) rotate(0deg);opacity:0}
+          69%{transform:translate(-3px,-10px) scale(1.5) rotate(-4deg);opacity:1}
+          100%{transform:translate(-15px,120px) scale(1.05) rotate(6deg);opacity:0}
+        }
+        @keyframes laMoney4 {
+          0%,62%{transform:translate(0,0) scale(0) rotate(0deg);opacity:0}
+          67%{transform:translate(-18px,-5px) scale(1.2) rotate(-20deg);opacity:1}
+          100%{transform:translate(-135px,65px) scale(0.85) rotate(-42deg);opacity:0}
+        }
+        @keyframes laMoney5 {
+          0%,65%{transform:translate(0,0) scale(0) rotate(0deg);opacity:0}
+          70%{transform:translate(14px,-4px) scale(1.2) rotate(18deg);opacity:1}
+          100%{transform:translate(125px,60px) scale(0.85) rotate(38deg);opacity:0}
+        }
+        @keyframes laWelcome {
+          0%,68%{opacity:0;transform:translateY(10px)}
+          82%{opacity:1;transform:translateY(0)}
+          90%{opacity:1}
+          100%{opacity:0}
+        }
+      `}</style>
+
+      {/* Full-screen fade overlay */}
+      <div style={{ animation: "laOverlay 2.8s ease-in-out forwards", position: "absolute", inset: 0 }} />
+
+      {/* Funnel + brain + money */}
+      <div style={{ position: "relative", width: 200, height: 220, zIndex: 1 }}>
+        {/* Funnel SVG */}
+        <svg width="200" height="220" viewBox="0 0 200 220" style={{ position: "absolute", inset: 0, animation: "laFunnelGlow 1.1s ease-in-out infinite" }}>
+          <defs>
+            <linearGradient id="laFG" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#a855f7" stopOpacity="0.2" />
+            </linearGradient>
+            <filter id="laGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="b" />
+              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          {/* Wide funnel */}
+          <path d="M 15 20 L 185 20 L 130 105 L 70 105 Z" fill="url(#laFG)" stroke="#6366f1" strokeWidth="1.5" filter="url(#laGlow)" strokeLinejoin="round" />
+          {/* Narrow spout */}
+          <path d="M 70 105 L 78 202 L 122 202 L 130 105 Z" fill="rgba(168,85,247,0.15)" stroke="#a855f7" strokeWidth="1.5" filter="url(#laGlow)" strokeLinejoin="round" />
+          {/* Spout exit glow */}
+          <line x1="78" y1="202" x2="122" y2="202" stroke="#4ade80" strokeWidth="2.5" opacity="0.7" />
+          {/* Top rim glow */}
+          <line x1="15" y1="20" x2="185" y2="20" stroke="#6366f1" strokeWidth="1" opacity="0.4" />
+        </svg>
+
+        {/* Brain logo spinning into funnel */}
+        <img
+          src="/arr-flow-logo.png"
+          alt=""
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "50%",
+            marginLeft: -24,
+            width: 48,
+            height: 48,
+            objectFit: "contain",
+            animation: "laBrain 2.8s cubic-bezier(0.4,0,0.8,1) forwards",
+            zIndex: 10,
+            filter: "drop-shadow(0 0 8px rgba(99,102,241,0.7))",
+          }}
+        />
+
+        {/* Money burst from spout */}
+        {[
+          { anim: "laMoney1", content: "💵", size: 24 },
+          { anim: "laMoney2", content: "💰", size: 22 },
+          { anim: "laMoney3", content: "💵", size: 26 },
+          { anim: "laMoney4", content: "$",  size: 20, color: "#4ade80", weight: 700 },
+          { anim: "laMoney5", content: "💰", size: 21 },
+        ].map(({ anim, content, size, color, weight }, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              bottom: 18,
+              left: "50%",
+              marginLeft: -12,
+              fontSize: size,
+              fontWeight: weight || 400,
+              color: color || undefined,
+              animation: `${anim} 2.8s ease-out forwards`,
+              zIndex: 11,
+              userSelect: "none",
+              lineHeight: 1,
+            }}
+          >
+            {content}
+          </div>
+        ))}
+      </div>
+
+      {/* Welcome text */}
+      <div style={{
+        position: "absolute",
+        bottom: "28%",
+        fontSize: 19,
+        fontWeight: 600,
+        color: "#a5f3fc",
+        letterSpacing: "-0.3px",
+        animation: "laWelcome 2.8s ease-out forwards",
+        zIndex: 1,
+      }}>
+        Welcome to ARR Flow
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function ARRFlow() {
   const [mode, setMode] = useState("explore");
@@ -895,6 +1038,7 @@ export default function ARRFlow() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
+  const [showLoginAnim, setShowLoginAnim] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (user) => {
@@ -1053,7 +1197,12 @@ export default function ARRFlow() {
     );
   }
 
-  if (!currentUser) return <LoginPage />;
+  if (!currentUser) return (
+    <>
+      {showLoginAnim && <LoginAnimation onDone={() => setShowLoginAnim(false)} />}
+      <LoginPage onLoginSuccess={() => setShowLoginAnim(true)} />
+    </>
+  );
 
   if (userProfile && !userProfile.active) {
     return (
@@ -1076,6 +1225,7 @@ export default function ARRFlow() {
 
   return (
     <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif", background:"#09090e", height:"100vh", overflow:"hidden", color:"#f0f0f5", display:"flex", flexDirection:"row" }}>
+      {showLoginAnim && <LoginAnimation onDone={() => setShowLoginAnim(false)} />}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing:border-box; margin:0; padding:0; }
