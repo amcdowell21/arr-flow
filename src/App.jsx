@@ -341,7 +341,7 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
     <div style={{
       width: 220, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.07)",
       background: "rgba(255,255,255,0.015)", display: "flex", flexDirection: "column",
-      minHeight: "100vh",
+      height: "100vh", position: "sticky", top: 0,
     }}>
       {/* App header / home link */}
       <button
@@ -1079,7 +1079,7 @@ export default function ARRFlow() {
   }
 
   return (
-    <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif", background:"#09090e", minHeight:"100vh", color:"#f0f0f5", display:"flex", flexDirection:"row" }}>
+    <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif", background:"#09090e", height:"100vh", overflow:"hidden", color:"#f0f0f5", display:"flex", flexDirection:"row" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing:border-box; margin:0; padding:0; }
@@ -1108,6 +1108,9 @@ export default function ARRFlow() {
         currentUser={currentUser}
         isAdmin={isAdmin}
       />
+
+      {/* Scrollable content area */}
+      <div style={{ flex: 1, overflowY: "auto", height: "100vh", minWidth: 0 }}>
 
       {/* Home page */}
       {view === "home" && <HomePage onNavigate={setView} />}
@@ -1258,6 +1261,7 @@ export default function ARRFlow() {
           </div>
         )}
       </div>
+      </div> {/* end scrollable content area */}
     </div>
   );
 }

@@ -50,10 +50,11 @@ service cloud.firestore {
     // Only admins can write invites.
 
     match /invitedEmails/{email} {
-      allow read: if isAuthenticated();
+      // Unauthenticated reads allowed so signup page can verify invite before account creation
+      allow read: if true;
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
-      // Allow invited user to mark their own invite as used
+      // Allow invited user to mark their own invite as used after they authenticate
       allow update: if isAuthenticated()
         && request.auth.token.email == email
         && request.resource.data.used == true;
