@@ -1313,6 +1313,8 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
   const [syncing,      setSyncing]      = useState(false);
   const [syncMsg,      setSyncMsg]      = useState(null);
   const [importing,    setImporting]    = useState(false);
+  const [searchQuery,  setSearchQuery]  = useState("");
+  const [productFilter, setProductFilter] = useState("all");
 
   // Firestore listeners
   useEffect(() => {
@@ -1510,6 +1512,29 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
     .filter(d => d.expectedCloseMonth === nextMonthKey)
     .reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
 
+  // ── Filtered deals (for month view) ──
+  const filteredDeals = deals.filter(d => {
+    if (searchQuery.trim()) {
+      if (!(d.name || "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    }
+    if (productFilter !== "all") {
+      if (productFilter === "unassigned") {
+        if (d.product && d.product !== "") return false;
+      } else {
+        if ((d.product || "") !== productFilter) return false;
+      }
+    }
+    return true;
+  });
+
+  const PRODUCT_FILTERS = [
+    { id: "all",        label: "All" },
+    { id: "uniqlearn",  label: "UniqLearn", color: "#0ea5e9" },
+    { id: "uniqpath",   label: "UniqPath",  color: "#a855f7" },
+    { id: "both",       label: "Both",      color: "#f59e0b" },
+    { id: "unassigned", label: "Unassigned", color: "#64748b" },
+  ];
+
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "28px 28px 60px", background: "#09090e", color: "#e2e8f0", minWidth: 0 }}>
       {/* Page header */}
@@ -1568,8 +1593,55 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
         ))}
       </div>
 
+      {/* Search + product filters */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 360 }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#475569", fontSize: 14, pointerEvents: "none" }}>🔍</span>
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search deals by name…"
+            style={{
+              width: "100%", boxSizing: "border-box",
+              paddingLeft: 32, paddingRight: searchQuery ? 28 : 10,
+              paddingTop: 7, paddingBottom: 7,
+              background: "#1e293b", border: "1px solid #334155",
+              borderRadius: 7, color: "#e2e8f0", fontSize: 13,
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}
+            >×</button>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {PRODUCT_FILTERS.map(f => {
+            const active = productFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setProductFilter(f.id)}
+                style={{
+                  padding: "5px 13px", fontSize: 12, borderRadius: 6, cursor: "pointer", fontWeight: active ? 600 : 400,
+                  border: active ? `1px solid ${f.color || "#6366f1"}` : "1px solid #334155",
+                  background: active ? (f.color ? f.color + "22" : "rgba(99,102,241,0.15)") : "#1e293b",
+                  color: active ? (f.color || "#a5b4fc") : "#94a3b8",
+                }}
+              >{f.label}</button>
+            );
+          })}
+        </div>
+        {(searchQuery || productFilter !== "all") && (
+          <span style={{ fontSize: 12, color: "#475569" }}>
+            {filteredDeals.length} of {deals.length} deals
+          </span>
+        )}
+      </div>
+
       {/* Month-by-month deal view */}
-      <MonthByMonthDeals deals={deals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} />
+      <MonthByMonthDeals deals={filteredDeals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} />
 
       {/* Event tracking */}
       <EventsSection events={events} onAdd={addEvent} onDelete={deleteEvent} />
