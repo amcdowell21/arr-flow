@@ -1,8 +1,86 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ── Helper functions ─────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isActiveUser() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+
+    function isAdmin() {
+      return isActiveUser()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isEmailInvited() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/invitedEmails/$(request.auth.token.email));
+    }
+
+    function isAdminEmail() {
+      return isAuthenticated() && request.auth.token.email == 'admin@uniqlearn.co';
+    }
+
+    // ── User profiles ────────────────────────────────────────────────────────
+    // Users can read their own profile; admins can read all.
+    // Users can create their own profile only if their email is invited or is the admin email.
+    // Only admins can update/delete other profiles.
+
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAuthenticated()
+        && request.auth.uid == uid
+        && (isEmailInvited() || isAdminEmail())
+        && request.resource.data.keys().hasAll(['email', 'role', 'active', 'createdAt'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role in ['admin', 'user'];
+      allow update: if isAdmin() && request.auth.uid != uid; // Admins update others only
+      allow delete: if isAdmin() && request.auth.uid != uid;
+    }
+
+    // ── Invited emails ───────────────────────────────────────────────────────
+    // Authenticated users can read (to verify their invite at signup).
+    // Only admins can write invites.
+
+    match /invitedEmails/{email} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+      // Allow invited user to mark their own invite as used
+      allow update: if isAuthenticated()
+        && request.auth.token.email == email
+        && request.resource.data.used == true;
+    }
+
+    // ── App data ─────────────────────────────────────────────────────────────
+    // All app data requires an active authenticated user.
+
+    match /scenarios/{id} {
+      allow read, write: if isActiveUser();
+    }
+
+    match /pipelineDeals/{id} {
+      allow read, write: if isActiveUser();
+    }
+
+    match /pipelineEvents/{id} {
+      allow read, write: if isActiveUser();
+    }
+
+    match /outboundActuals/{id} {
+      allow read, write: if isActiveUser();
+    }
+
+    // ── Deny everything else ─────────────────────────────────────────────────
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

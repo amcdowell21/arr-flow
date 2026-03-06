@@ -1,11 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import {
   collection, addDoc, onSnapshot, deleteDoc, doc, serverTimestamp, query, orderBy,
+  getDoc, setDoc,
 } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { fetchAllDeals, fetchPipelines, closedArrForYear } from "./hubspot";
 import PipelinePage from "./PipelinePage";
+import LoginPage from "./LoginPage";
+import AdminPanel from "./AdminPanel";
+
+const ADMIN_EMAIL = "admin@uniqlearn.co";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function formatCurrency(n) {
@@ -261,7 +267,7 @@ function SlidersPanel({ title, color, sections, values, onChange }) {
 }
 
 // ─── App Sidebar ──────────────────────────────────────────────────────────────
-function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, onSave, hs }) {
+function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, onSave, hs, currentUser, isAdmin }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -319,6 +325,18 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
     },
   ];
 
+  const allNavItems = isAdmin ? [...navItems, {
+    id: "admin",
+    label: "Admin Panel",
+    color: "#f59e0b",
+    icon: (active) => (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="5" r="2.3" stroke={active ? "#fcd34d" : "rgba(255,255,255,0.3)"} strokeWidth="1.4"/>
+        <path d="M2.5 12c0-2.49 2.01-4.5 4.5-4.5s4.5 2.01 4.5 4.5" stroke={active ? "#fcd34d" : "rgba(255,255,255,0.3)"} strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
+    ),
+  }] : navItems;
+
   return (
     <div style={{
       width: 220, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.07)",
@@ -351,7 +369,7 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
         <div style={{ fontSize: 9, fontFamily: "'DM Mono',monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", padding: "6px 8px 8px" }}>
           Workspace
         </div>
-        {navItems.map(item => {
+        {allNavItems.map(item => {
           const active = view === item.id;
           return (
             <div key={item.id}>
@@ -514,6 +532,29 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
           </>
         )}
       </div>
+
+      {/* User info + sign out */}
+      {currentUser && (
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {currentUser.email}
+            </div>
+          </div>
+          <button
+            onClick={() => signOut(auth)}
+            title="Sign out"
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: 4, lineHeight: 1, flexShrink: 0, borderRadius: 4, transition: "color 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.5)"}
+            onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M8 4l3 3-3 3M11 7H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -854,6 +895,45 @@ export default function ARRFlow() {
   const [nodeTypes, setNodeTypes] = useState({});
   const pageRef = useRef(null);
 
+  // ─── Auth state ────────────────────────────────────────────────────────────
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setCurrentUser(null);
+        setUserProfile(null);
+        setAuthLoading(false);
+        return;
+      }
+      setCurrentUser(user);
+      try {
+        const profileRef = doc(db, "users", user.uid);
+        const profileSnap = await getDoc(profileRef);
+        if (profileSnap.exists()) {
+          setUserProfile(profileSnap.data());
+        } else if (user.email === ADMIN_EMAIL) {
+          // Auto-create admin profile on first login
+          const profile = { email: user.email, role: "admin", active: true, createdAt: serverTimestamp() };
+          await setDoc(profileRef, profile);
+          setUserProfile(profile);
+        } else {
+          // Auth account exists but no app profile — revoke access
+          await signOut(auth);
+          setCurrentUser(null);
+          setUserProfile(null);
+        }
+      } catch {
+        setUserProfile(null);
+      }
+      setAuthLoading(false);
+    });
+  }, []);
+
+  const isAdmin = userProfile?.role === "admin";
+
   const handleToggleType = useCallback((id) => {
     setNodeTypes(p => {
       const cur = p[id];
@@ -868,13 +948,14 @@ export default function ARRFlow() {
   const [scenariosLoading, setScenariosLoading] = useState(true);
 
   useEffect(() => {
+    if (!currentUser) return;
     const q = query(collection(db, "scenarios"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, snap => {
       setScenarios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setScenariosLoading(false);
     });
     return unsub;
-  }, []);
+  }, [currentUser]);
 
   const handleSaveScenario = useCallback(async (name) => {
     await addDoc(collection(db, "scenarios"), { name, ob, ip, pd, nodeTypes, createdAt: serverTimestamp() });
@@ -967,6 +1048,36 @@ export default function ARRFlow() {
     onClosePage: () => setView("home"),
   };
 
+  // ─── Auth guards ───────────────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#09090e", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif" }}>
+        <div style={{ color: "#334155", fontSize: "13px" }}>Loading…</div>
+      </div>
+    );
+  }
+
+  if (!currentUser) return <LoginPage />;
+
+  if (userProfile && !userProfile.active) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#09090e", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif", padding: "20px" }}>
+        <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "36px", maxWidth: "380px", textAlign: "center" }}>
+          <div style={{ fontSize: "20px", fontWeight: "600", color: "#f1f5f9", marginBottom: "8px" }}>Account Deactivated</div>
+          <div style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "24px", lineHeight: "1.6" }}>
+            Your access has been revoked. Contact <strong style={{ color: "#a5b4fc" }}>admin@uniqlearn.co</strong> for help.
+          </div>
+          <button
+            onClick={() => signOut(auth)}
+            style={{ padding: "9px 20px", background: "transparent", border: "1px solid #334155", borderRadius: "8px", color: "#94a3b8", fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif", background:"#09090e", minHeight:"100vh", color:"#f0f0f5", display:"flex", flexDirection:"row" }}>
       <style>{`
@@ -994,6 +1105,8 @@ export default function ARRFlow() {
         onDelete={handleDeleteScenario}
         onSave={handleSaveScenario}
         hs={hs}
+        currentUser={currentUser}
+        isAdmin={isAdmin}
       />
 
       {/* Home page */}
@@ -1004,6 +1117,9 @@ export default function ARRFlow() {
 
       {/* Pipeline page */}
       {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} />}
+
+      {/* Admin panel (admin only) */}
+      {view === "admin" && isAdmin && <AdminPanel currentUser={currentUser} onNavigate={setView} />}
 
       {/* Input Metrics (main) content */}
       <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: (view !== "main") ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
