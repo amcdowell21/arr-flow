@@ -7,7 +7,7 @@ import {
   getDoc, setDoc, where, getDocs, updateDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { fetchAllDeals, fetchPipelines, closedArrForYear, updateDealStage, fetchDealContacts, fetchDealNotes } from "./hubspot";
+import { fetchAllDeals, fetchPipelines, closedArrForYear, updateDealStage, fetchDealContacts, fetchDealNotes, fetchDealStageHistory } from "./hubspot";
 import PipelinePage from "./PipelinePage";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
@@ -1066,11 +1066,12 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
 
 // ─── HubSpot Page ─────────────────────────────────────────────────────────────
 function HubSpotPage({ hs }) {
-  const { deals, pipelines, syncing, error, lastSync, closedArr } = hs;
+  const { deals, pipelines, syncing, error, lastSync, closedArr, demoStageId, demoHistory } = hs;
   const [activePipelineId, setActivePipelineId] = useState(null);
   const [expandedStageId, setExpandedStageId] = useState(null);
   const [boardView, setBoardView] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState(null);
+  const [hoveredDemoMonth, setHoveredDemoMonth] = useState(null);
 
   useEffect(() => {
     if (pipelines.length > 0 && !activePipelineId) {
@@ -1194,6 +1195,140 @@ function HubSpotPage({ hs }) {
           ))}
         </div>
       )}
+
+      {/* Monthly new deals chart */}
+      {deals.length > 0 && (() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const months = {};
+        for (let m = 0; m <= now.getMonth(); m++) {
+          const key = `${year}-${String(m + 1).padStart(2, "0")}`;
+          months[key] = 0;
+        }
+        deals.forEach(d => {
+          const cd = d.properties?.createdate;
+          if (!cd) return;
+          const dt = new Date(cd);
+          if (dt.getFullYear() !== year) return;
+          const key = `${year}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+          if (key in months) months[key]++;
+        });
+        const sortedMonths = Object.keys(months).sort();
+        const maxDeals = Math.max(...sortedMonths.map(k => months[k]), 1);
+        const totalYtd = sortedMonths.reduce((s, k) => s + months[k], 0);
+        const thisMonthKey = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        return (
+          <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:"16px 20px", marginBottom:28 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+                New Deals Added per Month — {year}
+              </div>
+              <span style={{ fontSize:11, color:"#818cf8", fontFamily:"'DM Mono',monospace" }}>{totalYtd} YTD</span>
+            </div>
+            <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:72 }}>
+              {sortedMonths.map(key => {
+                const count = months[key];
+                const barH = count > 0 ? Math.max(Math.round((count / maxDeals) * 56), 6) : 0;
+                const label = new Date(key + "-02").toLocaleDateString("en-US", { month:"short" });
+                const isCurrent = key === thisMonthKey;
+                return (
+                  <div key={key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+                    {count > 0 && (
+                      <span style={{ fontSize:9, color: isCurrent ? "#a5b4fc" : "var(--text-muted)", fontFamily:"'DM Mono',monospace" }}>{count}</span>
+                    )}
+                    <div style={{ width:"100%", flex:1, display:"flex", flexDirection:"column", justifyContent:"flex-end" }}>
+                      {barH > 0 && (
+                        <div style={{ width:"100%", height:barH, borderRadius:"3px 3px 0 0", background: isCurrent ? "linear-gradient(180deg,#818cf8,#6366f1)" : "#334155" }} />
+                      )}
+                    </div>
+                    <span style={{ fontSize:8, color: isCurrent ? "#818cf8" : "var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Demo Scheduled entries per month chart */}
+      {deals.length > 0 && demoStageId && (() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const months = {};
+        for (let m = 0; m <= now.getMonth(); m++) {
+          const key = `${year}-${String(m + 1).padStart(2, "0")}`;
+          months[key] = [];
+        }
+        deals.forEach(d => {
+          const history = demoHistory[d.id] ?? [];
+          // Find the first time this deal's stage was set to demoStageId
+          const entry = history.find(h => h.value === demoStageId);
+          if (!entry) return;
+          const dt = new Date(entry.timestamp);
+          if (dt.getFullYear() !== year) return;
+          const key = `${year}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+          if (key in months) months[key].push(d.properties?.dealname || "Unnamed");
+        });
+        const sortedMonths = Object.keys(months).sort();
+        const maxCount = Math.max(...sortedMonths.map(k => months[k].length), 1);
+        const totalYtd = sortedMonths.reduce((s, k) => s + months[k].length, 0);
+        const thisMonthKey = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        return (
+          <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:"16px 20px", marginBottom:28 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+              <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase" }}>
+                Deals Entered Demo Scheduled — {year}
+              </div>
+              <span style={{ fontSize:11, color:"#22d3ee", fontFamily:"'DM Mono',monospace" }}>{totalYtd} YTD</span>
+            </div>
+            <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:72 }}>
+              {sortedMonths.map(key => {
+                const monthDeals = months[key];
+                const count = monthDeals.length;
+                const barH = count > 0 ? Math.max(Math.round((count / maxCount) * 56), 6) : 0;
+                const label = new Date(key + "-02").toLocaleDateString("en-US", { month:"short" });
+                const isCurrent = key === thisMonthKey;
+                const isHovered = hoveredDemoMonth === key;
+                return (
+                  <div
+                    key={key}
+                    style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2, position:"relative" }}
+                    onMouseEnter={() => setHoveredDemoMonth(key)}
+                    onMouseLeave={() => setHoveredDemoMonth(null)}
+                  >
+                    {count > 0 && (
+                      <span style={{ fontSize:9, color: isCurrent ? "#67e8f9" : "var(--text-muted)", fontFamily:"'DM Mono',monospace" }}>{count}</span>
+                    )}
+                    <div style={{ width:"100%", flex:1, display:"flex", flexDirection:"column", justifyContent:"flex-end" }}>
+                      {barH > 0 && (
+                        <div style={{ width:"100%", height:barH, borderRadius:"3px 3px 0 0", background: isCurrent ? "linear-gradient(180deg,#22d3ee,#0891b2)" : "#1e3a4a" }} />
+                      )}
+                    </div>
+                    <span style={{ fontSize:8, color: isCurrent ? "#22d3ee" : "var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>{label}</span>
+                    {isHovered && count > 0 && (
+                      <div style={{
+                        position:"absolute", bottom:"100%", left:"50%", transform:"translateX(-50%)",
+                        background:"#0f172a", border:"1px solid #334155", borderRadius:8,
+                        padding:"8px 10px", zIndex:10, minWidth:160, marginBottom:6,
+                        boxShadow:"0 4px 16px rgba(0,0,0,0.4)",
+                      }}>
+                        <div style={{ fontSize:9, color:"#22d3ee", fontFamily:"'DM Mono',monospace", marginBottom:5, letterSpacing:"0.05em" }}>
+                          {new Date(key + "-02").toLocaleDateString("en-US", { month:"long" })} · {count} deal{count !== 1 ? "s" : ""}
+                        </div>
+                        {monthDeals.map((name, i) => (
+                          <div key={i} style={{ fontSize:11, color:"var(--text-body)", fontFamily:"'DM Sans',sans-serif", padding:"2px 0", borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                            {name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Pipeline tabs + stage view */}
       {pipelines.length > 0 && (
@@ -1492,6 +1627,8 @@ export default function ARRFlow() {
   const [hsToken, setHsToken]       = useState(() => localStorage.getItem("hs_token") || "");
   const [hsDeals, setHsDeals]       = useState([]);
   const [hsPipelines, setHsPipelines] = useState([]);
+  const [hsDemoStageId, setHsDemoStageId] = useState(null);
+  const [hsDemoHistory, setHsDemoHistory] = useState({});
   const [hsSyncing, setHsSyncing]   = useState(false);
   const [hsError, setHsError]       = useState(null);
   const [hsLastSync, setHsLastSync] = useState(null);
@@ -1588,12 +1725,22 @@ export default function ARRFlow() {
     setHsSyncing(true);
     setHsError(null);
     try {
-      const [deals, pipelines] = await Promise.all([
-        fetchAllDeals(hsToken.trim()),
+      const [pipelines, deals] = await Promise.all([
         fetchPipelines(hsToken.trim()),
+        fetchAllDeals(hsToken.trim()),
       ]);
+      let demoStageId = null;
+      for (const pl of pipelines) {
+        const stage = (pl.stages ?? []).find(s => s.label?.toLowerCase().includes("demo"));
+        if (stage) { demoStageId = stage.id; break; }
+      }
+      const history = demoStageId
+        ? await fetchDealStageHistory(hsToken.trim(), deals.map(d => d.id))
+        : {};
       setHsDeals(deals);
       setHsPipelines(pipelines);
+      setHsDemoStageId(demoStageId);
+      setHsDemoHistory(history);
       setHsLastSync(new Date());
     } catch (e) {
       setHsError(e.message);
@@ -1684,7 +1831,8 @@ export default function ARRFlow() {
   const hs = {
     token: hsToken, onTokenChange: handleHsTokenChange,
     syncing: hsSyncing, error: hsError, lastSync: hsLastSync,
-    deals: hsDeals, pipelines: hsPipelines, closedArr, onSync: syncHubspot,
+    deals: hsDeals, pipelines: hsPipelines, closedArr, demoStageId: hsDemoStageId, demoHistory: hsDemoHistory,
+    onSync: syncHubspot,
     onUpdateDealStage: handleUpdateDealStage,
     onClosePage: () => setView("home"),
   };

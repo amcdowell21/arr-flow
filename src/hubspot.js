@@ -35,18 +35,20 @@ async function hsGet(token, path) {
  * @param {string} token  HubSpot Private App token
  * @returns {Promise<Array>} raw deal objects
  */
-export async function fetchAllDeals(token) {
+export async function fetchAllDeals(token, demoProp = null) {
   let allDeals = [];
   let after;
 
   do {
+    const props = [
+      "dealname","amount","closedate","dealstage","pipeline",
+      "description","createdate","hs_lastmodifieddate",
+      "dealtype","hubspot_owner_id","hs_deal_stage_probability",
+      "num_associated_contacts","notes_last_updated",
+    ];
+    if (demoProp) props.push(demoProp);
     const params = new URLSearchParams({
-      properties: [
-        "dealname","amount","closedate","dealstage","pipeline",
-        "description","createdate","hs_lastmodifieddate",
-        "dealtype","hubspot_owner_id","hs_deal_stage_probability",
-        "num_associated_contacts","notes_last_updated",
-      ].join(","),
+      properties: props.join(","),
       limit: 100,
     });
     if (after) params.set("after", after);
@@ -123,6 +125,28 @@ async function hsPost(token, path, body) {
     throw new Error(err.message || `HubSpot error (${res.status})`);
   }
   return res.json();
+}
+
+/**
+ * Fetch dealstage property history for a list of deal IDs (batches of 100).
+ * Returns a map: { [dealId]: [{value, timestamp}] } sorted oldest→newest.
+ */
+export async function fetchDealStageHistory(token, dealIds) {
+  const result = {};
+  for (let i = 0; i < dealIds.length; i += 50) {
+    const batch = dealIds.slice(i, i + 50);
+    const data = await hsPost(token, "/crm/v3/objects/deals/batch/read", {
+      properties: [],
+      propertiesWithHistory: ["dealstage"],
+      inputs: batch.map(id => ({ id })),
+    });
+    for (const item of data.results ?? []) {
+      result[item.id] = (item.propertiesWithHistory?.dealstage ?? [])
+        .slice()
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    }
+  }
+  return result;
 }
 
 /**
