@@ -6,7 +6,7 @@ import {
   getDoc, setDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { fetchAllDeals, fetchPipelines, closedArrForYear } from "./hubspot";
+import { fetchAllDeals, fetchPipelines, closedArrForYear, updateDealStage } from "./hubspot";
 import PipelinePage from "./PipelinePage";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
@@ -647,11 +647,217 @@ function HomePage({ onNavigate }) {
   );
 }
 
+// ─── Kanban Board ─────────────────────────────────────────────────────────────
+function KanbanBoard({ deals, pipeline, onUpdateDealStage }) {
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
+  const [collapsed, setCollapsed] = useState(new Set());
+
+  const toggleCollapse = (stageId) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      next.has(stageId) ? next.delete(stageId) : next.add(stageId);
+      return next;
+    });
+  };
+
+  const sortedStages = (pipeline?.stages ?? []).slice().sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+
+  const handleDragStart = (e, dealId) => {
+    setDraggingId(dealId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleDragOver = (e, stageId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverStage(stageId);
+  };
+  const handleDrop = (e, stageId) => {
+    e.preventDefault();
+    if (draggingId) {
+      const deal = deals.find(d => d.id === draggingId);
+      if (deal && deal.properties?.dealstage !== stageId) {
+        onUpdateDealStage(draggingId, stageId);
+      }
+    }
+    setDraggingId(null);
+    setDragOverStage(null);
+  };
+  const handleDragEnd = () => { setDraggingId(null); setDragOverStage(null); };
+
+  const pipelineDeals = deals.filter(d => d.properties?.pipeline === pipeline?.id);
+
+  return (
+    <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:20, alignItems:"flex-start" }}>
+      {sortedStages.map(stage => {
+        const stageDeals = pipelineDeals.filter(d => d.properties?.dealstage === stage.id);
+        const stageValue = stageDeals.reduce((sum, d) => sum + (parseFloat(d.properties?.amount) || 0), 0);
+        const isOver = dragOverStage === stage.id;
+        const isCollapsed = collapsed.has(stage.id);
+        const isClosedWon  = stage.metadata?.probability === "1.0";
+        const isClosedLost = stage.metadata?.probability === "0.0";
+        const dotColor = isClosedWon ? "#34d399" : isClosedLost ? "#f87171" : "#818cf8";
+        const valColor  = isClosedWon ? "#6ee7b7" : "#c4b5fd";
+
+        if (isCollapsed) {
+          return (
+            <div
+              key={stage.id}
+              onDragOver={(e) => handleDragOver(e, stage.id)}
+              onDragLeave={() => setDragOverStage(null)}
+              onDrop={(e) => handleDrop(e, stage.id)}
+              style={{
+                flexShrink: 0, width: 36,
+                background: isOver ? "rgba(99,102,241,0.07)" : "rgba(255,255,255,0.02)",
+                border: `1px solid ${isOver ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 12, overflow: "hidden",
+                display: "flex", flexDirection: "column", alignItems: "center",
+                transition: "border 0.12s, background 0.12s",
+              }}
+            >
+              {/* Expand arrow */}
+              <button
+                onClick={() => toggleCollapse(stage.id)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: "10px 0 6px", color: "rgba(255,255,255,0.35)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: "100%", transition: "color 0.15s",
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M3 1.5L7 5 3 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {/* Rotated label */}
+              <div style={{
+                writingMode: "vertical-rl", transform: "rotate(180deg)",
+                fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.4)",
+                fontFamily: "'DM Sans',sans-serif", letterSpacing: "0.03em",
+                padding: "8px 0", whiteSpace: "nowrap", overflow: "hidden",
+                maxHeight: 160, textOverflow: "ellipsis",
+              }}>
+                {stage.label}
+              </div>
+              {/* Deal count dot */}
+              {stageDeals.length > 0 && (
+                <div style={{
+                  margin: "6px 0 10px",
+                  width: 18, height: 18, borderRadius: "50%",
+                  background: dotColor, opacity: 0.7,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 9, fontWeight: 700, color: "#09090e", fontFamily: "'DM Mono',monospace",
+                }}>
+                  {stageDeals.length}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={stage.id}
+            onDragOver={(e) => handleDragOver(e, stage.id)}
+            onDragLeave={() => setDragOverStage(null)}
+            onDrop={(e) => handleDrop(e, stage.id)}
+            style={{
+              flexShrink: 0, width: 230,
+              background: isOver ? "rgba(99,102,241,0.07)" : "rgba(255,255,255,0.02)",
+              border: `1px solid ${isOver ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
+              borderRadius: 12, overflow: "hidden",
+              transition: "border 0.12s, background 0.12s",
+            }}
+          >
+            {/* Column header */}
+            <div style={{ padding:"11px 13px 9px", borderBottom:"1px solid rgba(255,255,255,0.06)", background:"rgba(255,255,255,0.025)" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:3 }}>
+                <div style={{ width:7, height:7, borderRadius:2, background:dotColor, flexShrink:0 }} />
+                <span style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.8)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  {stage.label}
+                </span>
+                <span style={{ fontSize:10, color:"rgba(255,255,255,0.3)", fontFamily:"'DM Mono',monospace" }}>
+                  {stageDeals.length}
+                </span>
+                {/* Collapse arrow */}
+                <button
+                  onClick={() => toggleCollapse(stage.id)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    padding: "2px 2px 2px 4px", color: "rgba(255,255,255,0.25)",
+                    display: "flex", alignItems: "center", transition: "color 0.15s",
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M7 1.5L3 5 7 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              {stageValue > 0 && (
+                <div style={{ fontSize:10, color:valColor, fontFamily:"'DM Mono',monospace", paddingLeft:14 }}>
+                  {formatCurrency(stageValue)}
+                </div>
+              )}
+            </div>
+
+            {/* Cards */}
+            <div style={{ padding:8, display:"flex", flexDirection:"column", gap:6, minHeight:80 }}>
+              {stageDeals.map(deal => {
+                const amount = parseFloat(deal.properties?.amount) || 0;
+                const isDragging = draggingId === deal.id;
+                const closeDate = deal.properties?.closedate
+                  ? new Date(deal.properties.closedate).toLocaleDateString("en-US", { month:"short", year:"numeric" })
+                  : null;
+                return (
+                  <div
+                    key={deal.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, deal.id)}
+                    onDragEnd={handleDragEnd}
+                    style={{
+                      background: isDragging ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.045)",
+                      border: `1px solid ${isDragging ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.08)"}`,
+                      borderRadius: 8, padding: "9px 11px",
+                      cursor: "grab", opacity: isDragging ? 0.5 : 1,
+                      transition: "opacity 0.1s, border 0.1s",
+                    }}
+                  >
+                    <div style={{ fontSize:12, color:"rgba(255,255,255,0.78)", lineHeight:1.35, marginBottom: (amount > 0 || closeDate) ? 5 : 0 }}>
+                      {deal.properties?.dealname || "Untitled deal"}
+                    </div>
+                    {amount > 0 && (
+                      <div style={{ fontSize:11, fontWeight:600, color: isClosedWon ? "#6ee7b7" : "#a5f3fc", fontFamily:"'DM Mono',monospace" }}>
+                        {formatCurrency(amount)}
+                      </div>
+                    )}
+                    {closeDate && (
+                      <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", marginTop:3 }}>
+                        Close {closeDate}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {stageDeals.length === 0 && (
+                <div style={{ textAlign:"center", padding:"16px 0", fontSize:10, color: isOver ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.12)", fontFamily:"'DM Mono',monospace", transition:"color 0.12s" }}>
+                  {isOver ? "Drop here" : "No deals"}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── HubSpot Page ─────────────────────────────────────────────────────────────
 function HubSpotPage({ hs }) {
   const { deals, pipelines, syncing, error, lastSync, closedArr } = hs;
   const [activePipelineId, setActivePipelineId] = useState(null);
   const [expandedStageId, setExpandedStageId] = useState(null);
+  const [boardView, setBoardView] = useState(false);
 
   useEffect(() => {
     if (pipelines.length > 0 && !activePipelineId) {
@@ -695,6 +901,26 @@ function HubSpotPage({ hs }) {
         </div>
 
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          {/* List / Board toggle */}
+          {deals.length > 0 && (
+            <div style={{ display:"flex", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8, padding:2, gap:2 }}>
+              {[{ label:"List", value:false }, { label:"Board", value:true }].map(opt => (
+                <button
+                  key={opt.label}
+                  onClick={() => setBoardView(opt.value)}
+                  style={{
+                    padding:"5px 11px", borderRadius:6, fontSize:11, fontWeight:600,
+                    fontFamily:"'DM Mono',monospace", cursor:"pointer", transition:"all 0.15s",
+                    background: boardView === opt.value ? "rgba(255,255,255,0.1)" : "transparent",
+                    border: "none",
+                    color: boardView === opt.value ? "#f1f5f9" : "rgba(255,255,255,0.35)",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
           {lastSync && !syncing && (
             <span style={{ fontSize:9, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>
               Synced {lastSync.toLocaleTimeString()}
@@ -756,7 +982,7 @@ function HubSpotPage({ hs }) {
         </div>
       )}
 
-      {/* Pipeline tabs + stage table */}
+      {/* Pipeline tabs + stage view */}
       {pipelines.length > 0 && (
         <div>
           {/* Pipeline tabs */}
@@ -785,8 +1011,17 @@ function HubSpotPage({ hs }) {
             })}
           </div>
 
-          {/* Stage table */}
-          {pipeline && (
+          {/* Board view */}
+          {pipeline && boardView && (
+            <KanbanBoard
+              deals={deals}
+              pipeline={pipeline}
+              onUpdateDealStage={hs.onUpdateDealStage}
+            />
+          )}
+
+          {/* List view */}
+          {pipeline && !boardView && (
             <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
               {/* Column headers */}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 70px 130px 28px", padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.06)", background:"rgba(255,255,255,0.03)" }}>
@@ -1137,6 +1372,19 @@ export default function ARRFlow() {
     }
   }, [hsToken]);
 
+  const handleUpdateDealStage = useCallback(async (dealId, stageId) => {
+    setHsDeals(prev => prev.map(d =>
+      d.id === dealId ? { ...d, properties: { ...d.properties, dealstage: stageId } } : d
+    ));
+    try {
+      await updateDealStage(hsToken.trim(), dealId, stageId);
+    } catch (e) {
+      setHsError(`Failed to update deal: ${e.message}`);
+      // Re-sync to restore real state
+      syncHubspot();
+    }
+  }, [hsToken, syncHubspot]);
+
   // Auto-sync on mount if a token was previously saved
   useEffect(() => {
     const token = localStorage.getItem("hs_token");
@@ -1185,6 +1433,7 @@ export default function ARRFlow() {
     token: hsToken, onTokenChange: handleHsTokenChange,
     syncing: hsSyncing, error: hsError, lastSync: hsLastSync,
     deals: hsDeals, pipelines: hsPipelines, closedArr, onSync: syncHubspot,
+    onUpdateDealStage: handleUpdateDealStage,
     onClosePage: () => setView("home"),
   };
 

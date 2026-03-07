@@ -64,6 +64,40 @@ export async function fetchPipelines(token) {
   return data.results ?? [];
 }
 
+async function hsPatch(token, path, body) {
+  let url;
+  if (import.meta.env.DEV) {
+    url = `/hubspot-api${path}`;
+  } else {
+    url = `/api/hubspot?_path=${encodeURIComponent(path)}`;
+  }
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `HubSpot error (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Update the dealstage of a single deal.
+ * @param {string} token   HubSpot Private App token
+ * @param {string} dealId  HubSpot deal ID
+ * @param {string} stageId target stage ID
+ */
+export async function updateDealStage(token, dealId, stageId) {
+  return hsPatch(token, `/crm/v3/objects/deals/${dealId}`, {
+    properties: { dealstage: stageId },
+  });
+}
+
 /**
  * Sum the `amount` for closed-won deals in the given calendar year.
  * @param {Array}  deals  raw deal objects from fetchAllDeals

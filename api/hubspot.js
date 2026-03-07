@@ -8,9 +8,17 @@ export default async function handler(req, res) {
   const url = `https://api.hubapi.com${_path}${query.toString() ? "?" + query : ""}`;
 
   try {
-    const response = await fetch(url, {
-      headers: { Authorization: req.headers.authorization || "" },
-    });
+    const fetchOptions = {
+      method: req.method,
+      headers: {
+        Authorization: req.headers.authorization || "",
+        "Content-Type": "application/json",
+      },
+    };
+    if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
+      fetchOptions.body = JSON.stringify(req.body);
+    }
+    const response = await fetch(url, fetchOptions);
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (e) {
