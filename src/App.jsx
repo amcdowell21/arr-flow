@@ -1196,60 +1196,6 @@ function HubSpotPage({ hs }) {
         </div>
       )}
 
-      {/* Monthly new deals chart */}
-      {deals.length > 0 && (() => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const months = {};
-        for (let m = 0; m <= now.getMonth(); m++) {
-          const key = `${year}-${String(m + 1).padStart(2, "0")}`;
-          months[key] = 0;
-        }
-        deals.forEach(d => {
-          const cd = d.properties?.createdate;
-          if (!cd) return;
-          const dt = new Date(cd);
-          if (dt.getFullYear() !== year) return;
-          const key = `${year}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-          if (key in months) months[key]++;
-        });
-        const sortedMonths = Object.keys(months).sort();
-        const maxDeals = Math.max(...sortedMonths.map(k => months[k]), 1);
-        const totalYtd = sortedMonths.reduce((s, k) => s + months[k], 0);
-        const thisMonthKey = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        return (
-          <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:"16px 20px", marginBottom:28 }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-              <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase" }}>
-                New Deals Added per Month — {year}
-              </div>
-              <span style={{ fontSize:11, color:"#818cf8", fontFamily:"'DM Mono',monospace" }}>{totalYtd} YTD</span>
-            </div>
-            <div style={{ display:"flex", alignItems:"flex-end", gap:6, height:72 }}>
-              {sortedMonths.map(key => {
-                const count = months[key];
-                const barH = count > 0 ? Math.max(Math.round((count / maxDeals) * 56), 6) : 0;
-                const label = new Date(key + "-02").toLocaleDateString("en-US", { month:"short" });
-                const isCurrent = key === thisMonthKey;
-                return (
-                  <div key={key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
-                    {count > 0 && (
-                      <span style={{ fontSize:9, color: isCurrent ? "#a5b4fc" : "var(--text-muted)", fontFamily:"'DM Mono',monospace" }}>{count}</span>
-                    )}
-                    <div style={{ width:"100%", flex:1, display:"flex", flexDirection:"column", justifyContent:"flex-end" }}>
-                      {barH > 0 && (
-                        <div style={{ width:"100%", height:barH, borderRadius:"3px 3px 0 0", background: isCurrent ? "linear-gradient(180deg,#818cf8,#6366f1)" : "#334155" }} />
-                      )}
-                    </div>
-                    <span style={{ fontSize:8, color: isCurrent ? "#818cf8" : "var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>{label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Demo Scheduled entries per month chart */}
       {deals.length > 0 && demoStageId && (() => {
         const now = new Date();

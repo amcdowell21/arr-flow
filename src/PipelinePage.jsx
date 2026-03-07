@@ -1449,6 +1449,8 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
   const [searchQuery,  setSearchQuery]  = useState("");
   const [productFilter, setProductFilter] = useState("all");
   const [activeTab,    setActiveTab]    = useState("dashboards");
+  const [showCloseChart, setShowCloseChart] = useState(true);
+  const [showAddedChart, setShowAddedChart] = useState(true);
 
   // Firestore listeners
   useEffect(() => {
@@ -1829,6 +1831,197 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
               </span>
             )}
           </div>
+          {/* Pipeline by Close Month chart */}
+          {deals.length > 0 && (() => {
+            const monthMap = {};
+            deals.forEach(d => {
+              const month = d.expectedCloseMonth;
+              if (!month) return;
+              if (!monthMap[month]) monthMap[month] = { full: 0, adj: 0 };
+              const conf = d.useAlgoConfidence
+                ? (() => {
+                    let s = d.hubspotStageProbability != null ? d.hubspotStageProbability * 100 : 30;
+                    if (d.meetingBooked) s += 15;
+                    const t = d.touchCount || 0;
+                    if (t >= 6) s += 20; else if (t >= 3) s += 10; else if (t >= 1) s += 5;
+                    if (d.lastActivityDate) {
+                      const days = Math.floor((Date.now() - new Date(d.lastActivityDate)) / 86_400_000);
+                      if (days >= 60) s -= 20; else if (days >= 30) s -= 10;
+                    }
+                    return Math.max(0, Math.min(100, Math.round(s)));
+                  })()
+                : (d.manualConfidence ?? 50);
+              const val = d.value || 0;
+              monthMap[month].full += val;
+              monthMap[month].adj += val * (conf / 100);
+            });
+            const sortedMonths = Object.keys(monthMap).sort();
+            if (sortedMonths.length === 0) return null;
+            const maxFull = Math.max(...sortedMonths.map(k => monthMap[k].full), 1);
+            const totalFull = sortedMonths.reduce((s, k) => s + monthMap[k].full, 0);
+            const totalAdj = sortedMonths.reduce((s, k) => s + monthMap[k].adj, 0);
+            const fmt = n => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${Math.round(n)}`;
+            return (
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 20px", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showCloseChart ? 14 : 0 }}>
+                  <button
+                    onClick={() => setShowCloseChart(v => !v)}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span style={{ fontSize: 9, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      Pipeline by Close Month
+                    </span>
+                    <span style={{ fontSize: 10, color: "#475569" }}>{showCloseChart ? "▲" : "▼"}</span>
+                  </button>
+                  {showCloseChart && (
+                    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: "#818cf8", fontFamily: "'DM Mono',monospace" }}>{fmt(totalFull)} full</span>
+                      <span style={{ fontSize: 11, color: "#a5f3fc", fontFamily: "'DM Mono',monospace" }}>{fmt(totalAdj)} adj</span>
+                    </div>
+                  )}
+                </div>
+                {showCloseChart && (
+                  <>
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 88 }}>
+                      {sortedMonths.map(key => {
+                        const { full, adj } = monthMap[key];
+                        const fullH = full > 0 ? Math.max(Math.round((full / maxFull) * 68), 6) : 0;
+                        const adjH = adj > 0 ? Math.max(Math.round((adj / maxFull) * 68), 4) : 0;
+                        const label = new Date(key + "-02").toLocaleDateString("en-US", { month: "short" });
+                        return (
+                          <div key={key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                            <span style={{ fontSize: 9, color: "#a5f3fc", fontFamily: "'DM Mono',monospace" }}>{fmt(adj)}</span>
+                            <div style={{ width: "100%", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", position: "relative" }}>
+                              {fullH > 0 && <div style={{ width: "100%", height: fullH, borderRadius: "3px 3px 0 0", background: "#334155", position: "absolute", bottom: 0 }} />}
+                              {adjH > 0 && <div style={{ width: "100%", height: adjH, borderRadius: "3px 3px 0 0", background: "linear-gradient(180deg,#67e8f9,#06b6d4)", position: "absolute", bottom: 0 }} />}
+                            </div>
+                            <span style={{ fontSize: 8, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace" }}>{label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 2, background: "#334155" }} />
+                        <span style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace" }}>Full pipeline</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 2, background: "linear-gradient(180deg,#67e8f9,#06b6d4)" }} />
+                        <span style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace" }}>Adjusted</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Pipeline Added by Month chart */}
+          {deals.length > 0 && (() => {
+            const monthMap = {};
+            deals.forEach(d => {
+              const ts = d.createdAt;
+              if (!ts) return;
+              const dt = typeof ts.toDate === "function" ? ts.toDate() : ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+              if (isNaN(dt)) return;
+              const month = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+              if (!monthMap[month]) monthMap[month] = { full: 0, adj: 0 };
+              const conf = d.useAlgoConfidence
+                ? (() => {
+                    let s = d.hubspotStageProbability != null ? d.hubspotStageProbability * 100 : 30;
+                    if (d.meetingBooked) s += 15;
+                    const t = d.touchCount || 0;
+                    if (t >= 6) s += 20; else if (t >= 3) s += 10; else if (t >= 1) s += 5;
+                    if (d.lastActivityDate) {
+                      const days = Math.floor((Date.now() - new Date(d.lastActivityDate)) / 86_400_000);
+                      if (days >= 60) s -= 20; else if (days >= 30) s -= 10;
+                    }
+                    return Math.max(0, Math.min(100, Math.round(s)));
+                  })()
+                : (d.manualConfidence ?? 50);
+              const val = d.value || 0;
+              monthMap[month].full += val;
+              monthMap[month].adj += val * (conf / 100);
+            });
+            const sortedMonths = Object.keys(monthMap).sort();
+            if (sortedMonths.length === 0) return null;
+            const maxFull = Math.max(...sortedMonths.map(k => monthMap[k].full), 1);
+            const totalFull = sortedMonths.reduce((s, k) => s + monthMap[k].full, 0);
+            const totalAdj = sortedMonths.reduce((s, k) => s + monthMap[k].adj, 0);
+            const fmt = n => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${Math.round(n)}`;
+            return (
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showAddedChart ? 14 : 0 }}>
+                  <button
+                    onClick={() => setShowAddedChart(v => !v)}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span style={{ fontSize: 9, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      Pipeline Added by Month
+                    </span>
+                    <span style={{ fontSize: 10, color: "#475569" }}>{showAddedChart ? "▲" : "▼"}</span>
+                  </button>
+                  {showAddedChart && (
+                    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: "#818cf8", fontFamily: "'DM Mono',monospace" }}>{fmt(totalFull)} full</span>
+                      <span style={{ fontSize: 11, color: "#a5f3fc", fontFamily: "'DM Mono',monospace" }}>{fmt(totalAdj)} adj</span>
+                    </div>
+                  )}
+                </div>
+                {showAddedChart && (
+                  <>
+                    <div style={{ display: "flex", gap: 0 }}>
+                      {/* Y-axis */}
+                      <div style={{ width: 40, flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", height: 84, paddingRight: 6, boxSizing: "border-box" }}>
+                        <span style={{ fontSize: 8, color: "#475569", fontFamily: "'DM Mono',monospace", textAlign: "right", lineHeight: 1 }}>{fmt(maxFull)}</span>
+                        <span style={{ fontSize: 8, color: "#475569", fontFamily: "'DM Mono',monospace", textAlign: "right", lineHeight: 1 }}>{fmt(Math.round(maxFull / 2))}</span>
+                        <span style={{ fontSize: 8, color: "#475569", fontFamily: "'DM Mono',monospace", textAlign: "right", lineHeight: 1 }}>$0</span>
+                      </div>
+                      {/* Bar area */}
+                      <div style={{ flex: 1, height: 84, position: "relative" }}>
+                        <div style={{ position: "absolute", top: 0, left: 0, right: 0, borderTop: "1px dashed #1e293b" }} />
+                        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, borderTop: "1px dashed #1e293b" }} />
+                        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, borderTop: "1px solid #334155" }} />
+                        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-end", gap: 6 }}>
+                          {sortedMonths.map(key => {
+                            const { full, adj } = monthMap[key];
+                            const fullH = full > 0 ? Math.max(Math.round((full / maxFull) * 80), 4) : 0;
+                            const adjH = adj > 0 ? Math.max(Math.round((adj / maxFull) * 80), 3) : 0;
+                            return (
+                              <div key={key} style={{ flex: 1, height: "100%", position: "relative" }}>
+                                {fullH > 0 && <div style={{ position: "absolute", bottom: 0, width: "100%", height: fullH, borderRadius: "3px 3px 0 0", background: "#334155" }} />}
+                                {adjH > 0 && <div style={{ position: "absolute", bottom: 0, width: "100%", height: adjH, borderRadius: "3px 3px 0 0", background: "linear-gradient(180deg,#a78bfa,#7c3aed)" }} />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Month labels */}
+                    <div style={{ display: "flex", gap: 6, marginLeft: 40, marginTop: 4 }}>
+                      {sortedMonths.map(key => (
+                        <div key={key} style={{ flex: 1, textAlign: "center" }}>
+                          <span style={{ fontSize: 8, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace" }}>
+                            {new Date(key + "-02").toLocaleDateString("en-US", { month: "short" })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 2, background: "#334155" }} />
+                        <span style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace" }}>Full pipeline</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 2, background: "linear-gradient(180deg,#a78bfa,#7c3aed)" }} />
+                        <span style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace" }}>Adjusted</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
           <MonthByMonthDeals deals={filteredDeals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} token={hsToken} />
         </>
       )}
