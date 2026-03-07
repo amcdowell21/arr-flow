@@ -252,14 +252,14 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
     padding: "8px 10px",
     borderBottom: "1px solid rgba(255,255,255,0.05)",
     verticalAlign: "middle",
-    color: "#e2e8f0",
+    color: "var(--text-body)",
     fontSize: 13,
   };
   const inp = {
-    background: "#0f172a",
+    background: "var(--surface-deep)",
     border: "1px solid #334155",
     borderRadius: 4,
-    color: "#e2e8f0",
+    color: "var(--text-body)",
     padding: "4px 8px",
     fontSize: 13,
   };
@@ -273,7 +273,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             {/* Row 0: contact info + product + state */}
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Contact Name</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Contact Name</label>
                 <input
                   value={local.contactName || ""}
                   onChange={e => setLocal(p => ({ ...p, contactName: e.target.value }))}
@@ -282,7 +282,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Contact Info</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Contact Info</label>
                 <input
                   value={local.contactInfo || ""}
                   onChange={e => setLocal(p => ({ ...p, contactInfo: e.target.value }))}
@@ -291,7 +291,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Product</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Product</label>
                 <select
                   value={local.product || ""}
                   onChange={e => setLocal(p => ({ ...p, product: e.target.value }))}
@@ -302,7 +302,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>State</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>State</label>
                 <select
                   value={local.state || ""}
                   onChange={e => setLocal(p => ({ ...p, state: e.target.value }))}
@@ -317,7 +317,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             {/* Row 0.5: funnel source */}
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 4 }}>Funnel Source</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 4 }}>Funnel Source</label>
                 <div style={{ display: "flex", gap: 6 }}>
                   {[["", "None"], ["outbound", "Outbound"], ["event", "Event"], ["podcast", "Podcast"]].map(([type, label]) => (
                     <button
@@ -327,7 +327,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                         padding: "4px 11px", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer",
                         background: local.funnelType === type
                           ? (type === "outbound" ? "#b45309" : type === "event" ? "#0369a1" : type === "podcast" ? "#6d28d9" : "#6366f1")
-                          : "#334155",
+                          : "var(--border-strong)",
                         color: "#fff",
                       }}
                     >
@@ -338,7 +338,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
               </div>
               {local.funnelType === "event" && (
                 <div>
-                  <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Event</label>
+                  <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Event</label>
                   <select
                     value={local.funnelEventId || ""}
                     onChange={e => setLocal(p => ({ ...p, funnelEventId: e.target.value }))}
@@ -358,7 +358,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             {/* Row 1: name / value / close month / bucket */}
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Customer Name</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Customer Name</label>
                 <input
                   value={local.name}
                   onChange={e => setLocal(p => ({ ...p, name: e.target.value }))}
@@ -366,7 +366,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Contract Size ($)</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Contract Size ($)</label>
                 <input
                   type="number"
                   value={local.value}
@@ -375,7 +375,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Close Month</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Close Month</label>
                 <select
                   value={local.expectedCloseMonth || ""}
                   onChange={e => setLocal(p => ({ ...p, expectedCloseMonth: e.target.value }))}
@@ -386,7 +386,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Bucket</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Bucket</label>
                 <select
                   value={local.bucket}
                   onChange={e => setLocal(p => ({ ...p, bucket: e.target.value }))}
@@ -400,17 +400,17 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             {/* Row 2: confidence / meeting / touches / last activity */}
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 4 }}>Confidence Mode</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 4 }}>Confidence Mode</label>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     onClick={() => setLocal(p => ({ ...p, useAlgoConfidence: true }))}
-                    style={{ padding: "4px 11px", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: local.useAlgoConfidence ? "#6366f1" : "#334155", color: "#fff" }}
+                    style={{ padding: "4px 11px", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: local.useAlgoConfidence ? "#6366f1" : "var(--border-strong)", color: "#fff" }}
                   >
                     Algorithm ({computeAlgoConfidence(local)}%)
                   </button>
                   <button
                     onClick={() => setLocal(p => ({ ...p, useAlgoConfidence: false }))}
-                    style={{ padding: "4px 11px", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: !local.useAlgoConfidence ? "#6366f1" : "#334155", color: "#fff" }}
+                    style={{ padding: "4px 11px", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: !local.useAlgoConfidence ? "#6366f1" : "var(--border-strong)", color: "#fff" }}
                   >
                     Manual
                   </button>
@@ -418,7 +418,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
               </div>
               {!local.useAlgoConfidence && (
                 <div>
-                  <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>
+                  <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>
                     Manual: {local.manualConfidence ?? 50}%
                   </label>
                   <input
@@ -430,7 +430,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 </div>
               )}
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Meeting Booked</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Meeting Booked</label>
                 <input
                   type="checkbox"
                   checked={local.meetingBooked || false}
@@ -448,7 +448,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Touches</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Touches</label>
                 <input
                   type="number" min={0}
                   value={local.touchCount || 0}
@@ -457,7 +457,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Last Activity</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Last Activity</label>
                 <input
                   type="date"
                   value={local.lastActivityDate || ""}
@@ -469,7 +469,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
 
             {/* Notes */}
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Notes</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Notes</label>
               <textarea
                 value={local.notes || ""}
                 onChange={e => setLocal(p => ({ ...p, notes: e.target.value }))}
@@ -496,12 +496,12 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                         const cp = c.properties || {};
                         const name = [cp.firstname, cp.lastname].filter(Boolean).join(" ") || "Unknown";
                         return (
-                          <div key={c.id} style={{ background: "#0f172a", border: "1px solid #1e3a5f", borderRadius: 6, padding: "8px 11px" }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{name}</div>
-                            {cp.jobtitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>{cp.jobtitle}</div>}
+                          <div key={c.id} style={{ background: "var(--surface-deep)", border: "1px solid #1e3a5f", borderRadius: 6, padding: "8px 11px" }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-body)" }}>{name}</div>
+                            {cp.jobtitle && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{cp.jobtitle}</div>}
                             <div style={{ display: "flex", gap: 12, marginTop: 3, flexWrap: "wrap" }}>
                               {cp.email && <a href={`mailto:${cp.email}`} style={{ fontSize: 11, color: "#818cf8", textDecoration: "none" }}>{cp.email}</a>}
-                              {cp.phone && <span style={{ fontSize: 11, color: "#64748b" }}>{cp.phone}</span>}
+                              {cp.phone && <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{cp.phone}</span>}
                             </div>
                           </div>
                         );
@@ -526,10 +526,10 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                         const body = np.hs_note_body?.replace(/<[^>]*>/g, "") || "";
                         const ts = np.hs_timestamp ? new Date(np.hs_timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
                         return (
-                          <div key={n.id} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, padding: "8px 11px" }}>
+                          <div key={n.id} style={{ background: "var(--surface-deep)", border: "1px solid #334155", borderRadius: 6, padding: "8px 11px" }}>
                             {ts && <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{ts}</div>}
-                            <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                              {body || <span style={{ color: "#334155" }}>(empty)</span>}
+                            <div style={{ fontSize: 12, color: "var(--text-label)", lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {body || <span style={{ color: "var(--border-strong)" }}>(empty)</span>}
                             </div>
                           </div>
                         );
@@ -543,7 +543,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             {/* Actions */}
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={save} style={{ padding: "5px 16px", background: "#6366f1", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13 }}>Save</button>
-              <button onClick={() => { setLocal(deal); setEditing(false); }} style={{ padding: "5px 16px", background: "#334155", color: "#e2e8f0", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+              <button onClick={() => { setLocal(deal); setEditing(false); }} style={{ padding: "5px 16px", background: "var(--border-strong)", color: "var(--text-body)", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13 }}>Cancel</button>
               <button onClick={() => onDelete(deal.id)} style={{ padding: "5px 16px", background: "#7f1d1d", color: "#fca5a5", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13, marginLeft: "auto" }}>Delete</button>
             </div>
           </div>
@@ -579,7 +579,7 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             )
           )}
           {local.state && (
-            <span style={{ fontSize: 10, color: "#64748b", padding: "1px 0" }}>{local.state}</span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)", padding: "1px 0" }}>{local.state}</span>
           )}
           {local.source === "hubspot" && (
             <span style={{ fontSize: 10, background: "#0369a1", color: "#bae6fd", borderRadius: 3, padding: "1px 5px" }}>HS</span>
@@ -597,10 +597,10 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
           )}
         </div>
         {local.contactName && (
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{local.contactName}</div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{local.contactName}</div>
         )}
       </td>
-      <td style={{ ...cell, textAlign: "right", color: local.closedWon ? "#4ade80" : "#e2e8f0" }}>{formatCurrency(local.value)}</td>
+      <td style={{ ...cell, textAlign: "right", color: local.closedWon ? "#4ade80" : "var(--text-body)" }}>{formatCurrency(local.value)}</td>
       <td style={{ ...cell, textAlign: "center" }}>
         {local.closedWon
           ? <span style={{ fontSize: 11, color: "#4ade80" }}>closed</span>
@@ -610,16 +610,16 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             </>
         }
       </td>
-      <td style={{ ...cell, textAlign: "right", color: local.closedWon ? "#64748b" : "#a5f3fc", fontWeight: 600 }}>
-        {local.closedWon ? <span style={{ color: "#334155" }}>—</span> : formatCurrency(adjustedValue)}
+      <td style={{ ...cell, textAlign: "right", color: local.closedWon ? "var(--text-muted)" : "#a5f3fc", fontWeight: 600 }}>
+        {local.closedWon ? <span style={{ color: "var(--border-strong)" }}>—</span> : formatCurrency(adjustedValue)}
       </td>
-      <td style={{ ...cell, textAlign: "center", color: "#64748b" }}>
-        {local.touchCount > 0 ? local.touchCount : <span style={{ color: "#334155" }}>—</span>}
+      <td style={{ ...cell, textAlign: "center", color: "var(--text-muted)" }}>
+        {local.touchCount > 0 ? local.touchCount : <span style={{ color: "var(--border-strong)" }}>—</span>}
       </td>
-      <td style={{ ...cell, color: "#64748b", fontSize: 12, maxWidth: 200 }}>
+      <td style={{ ...cell, color: "var(--text-muted)", fontSize: 12, maxWidth: 200 }}>
         {local.notes
           ? (local.notes.length > 45 ? local.notes.slice(0, 45) + "…" : local.notes)
-          : <span style={{ color: "#334155" }}>—</span>}
+          : <span style={{ color: "var(--border-strong)" }}>—</span>}
       </td>
     </tr>
   );
@@ -658,15 +658,15 @@ function HubSpotDealPicker({ hsDeals, hsPipelines, onSelect, onBack }) {
     );
   }
 
-  const hdr = { padding: "7px 10px", fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "left", borderBottom: "1px solid #334155" };
-  const cell = { padding: "8px 10px", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.04)", color: "#e2e8f0", verticalAlign: "middle" };
+  const hdr = { padding: "7px 10px", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "left", borderBottom: "1px solid #334155" };
+  const cell = { padding: "8px 10px", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.04)", color: "var(--text-body)", verticalAlign: "middle" };
 
   return (
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
         <button
           onClick={onBack}
-          style={{ padding: "5px 12px", background: "#334155", color: "#e2e8f0", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}
+          style={{ padding: "5px 12px", background: "var(--border-strong)", color: "var(--text-body)", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}
         >
           ← Back
         </button>
@@ -675,7 +675,7 @@ function HubSpotDealPicker({ hsDeals, hsPipelines, onSelect, onBack }) {
           onChange={e => setSearch(e.target.value)}
           placeholder="Search deals…"
           autoFocus
-          style={{ flex: 1, background: "#0f172a", border: "1px solid #334155", borderRadius: 5, color: "#e2e8f0", padding: "6px 10px", fontSize: 13 }}
+          style={{ flex: 1, background: "var(--surface-deep)", border: "1px solid #334155", borderRadius: 5, color: "var(--text-body)", padding: "6px 10px", fontSize: 13 }}
         />
         <span style={{ fontSize: 12, color: "#475569", whiteSpace: "nowrap" }}>{filtered.length} deal{filtered.length !== 1 ? "s" : ""}</span>
       </div>
@@ -689,7 +689,7 @@ function HubSpotDealPicker({ hsDeals, hsPipelines, onSelect, onBack }) {
       ) : (
         <div style={{ maxHeight: 340, overflowY: "auto", borderRadius: 6, border: "1px solid #334155" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead style={{ position: "sticky", top: 0, background: "#1e293b" }}>
+            <thead style={{ position: "sticky", top: 0, background: "var(--surface)" }}>
               <tr>
                 <th style={hdr}>Deal Name</th>
                 <th style={hdr}>Pipeline</th>
@@ -713,10 +713,10 @@ function HubSpotDealPicker({ hsDeals, hsPipelines, onSelect, onBack }) {
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
                     <td style={{ ...cell, fontWeight: 500 }}>{d.properties?.dealname || "Unnamed"}</td>
-                    <td style={{ ...cell, color: "#94a3b8" }}>{pipelineLabel}</td>
-                    <td style={{ ...cell, color: "#94a3b8" }}>{stageLabel}</td>
+                    <td style={{ ...cell, color: "var(--text-label)" }}>{pipelineLabel}</td>
+                    <td style={{ ...cell, color: "var(--text-label)" }}>{stageLabel}</td>
                     <td style={{ ...cell, textAlign: "right", color: "#a5f3fc" }}>{amount > 0 ? formatCurrency(amount) : "—"}</td>
-                    <td style={{ ...cell, color: "#64748b" }}>
+                    <td style={{ ...cell, color: "var(--text-muted)" }}>
                       {closedate
                         ? new Date(closedate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
                         : "—"}
@@ -787,13 +787,13 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
     zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
   };
   const card = {
-    background: "#1e293b", border: "1px solid #334155", borderRadius: 12,
+    background: "var(--surface)", border: "1px solid #334155", borderRadius: 12,
     padding: 28, width: 580, maxWidth: "96vw", maxHeight: "92vh", overflowY: "auto",
   };
-  const lbl = { fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 4 };
+  const lbl = { fontSize: 12, color: "var(--text-label)", display: "block", marginBottom: 4 };
   const inp = {
-    background: "#0f172a", border: "1px solid #334155", borderRadius: 5,
-    color: "#e2e8f0", padding: "6px 10px", fontSize: 14, width: "100%", boxSizing: "border-box",
+    background: "var(--surface-deep)", border: "1px solid #334155", borderRadius: 5,
+    color: "var(--text-body)", padding: "6px 10px", fontSize: 14, width: "100%", boxSizing: "border-box",
   };
 
   // ── Mode picker screen ────────────────────────────────────────────────────
@@ -801,37 +801,37 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
     return (
       <div style={overlay} onClick={onClose}>
         <div style={{ ...card, width: 480 }} onClick={e => e.stopPropagation()}>
-          <h3 style={{ color: "#f1f5f9", margin: "0 0 6px", fontSize: 17, fontWeight: 600 }}>Add to Pipeline</h3>
-          <p style={{ color: "#64748b", fontSize: 13, margin: "0 0 24px" }}>How would you like to add this deal?</p>
+          <h3 style={{ color: "var(--text)", margin: "0 0 6px", fontSize: 17, fontWeight: 600 }}>Add to Pipeline</h3>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, margin: "0 0 24px" }}>How would you like to add this deal?</p>
           <div style={{ display: "flex", gap: 14 }}>
             <button
               onClick={() => setMode("manual")}
               style={{
-                flex: 1, padding: "20px 16px", background: "#0f172a", border: "2px solid #334155",
+                flex: 1, padding: "20px 16px", background: "var(--surface-deep)", border: "2px solid #334155",
                 borderRadius: 10, cursor: "pointer", textAlign: "center", transition: "border-color 0.15s",
               }}
               onMouseEnter={e => e.currentTarget.style.borderColor = "#6366f1"}
-              onMouseLeave={e => e.currentTarget.style.borderColor = "#334155"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = "var(--border-strong)"}
             >
               <div style={{ fontSize: 28, marginBottom: 10 }}>✏️</div>
-              <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 15, marginBottom: 6 }}>Manual Add</div>
-              <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>Enter deal details from scratch</div>
+              <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 15, marginBottom: 6 }}>Manual Add</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>Enter deal details from scratch</div>
             </button>
             <button
               onClick={() => setMode("hubspot")}
               disabled={!hsDeals || hsDeals.length === 0}
               style={{
-                flex: 1, padding: "20px 16px", background: "#0f172a",
-                border: `2px solid ${hsDeals?.length > 0 ? "#334155" : "#1e293b"}`,
+                flex: 1, padding: "20px 16px", background: "var(--surface-deep)",
+                border: `2px solid ${hsDeals?.length > 0 ? "var(--border-strong)" : "var(--surface)"}`,
                 borderRadius: 10, cursor: hsDeals?.length > 0 ? "pointer" : "not-allowed",
                 textAlign: "center", opacity: hsDeals?.length > 0 ? 1 : 0.45,
               }}
               onMouseEnter={e => { if (hsDeals?.length > 0) e.currentTarget.style.borderColor = "#0ea5e9"; }}
-              onMouseLeave={e => { if (hsDeals?.length > 0) e.currentTarget.style.borderColor = "#334155"; }}
+              onMouseLeave={e => { if (hsDeals?.length > 0) e.currentTarget.style.borderColor = "var(--border-strong)"; }}
             >
               <div style={{ fontSize: 28, marginBottom: 10 }}>🔗</div>
-              <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 15, marginBottom: 6 }}>Choose from HubSpot</div>
-              <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+              <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 15, marginBottom: 6 }}>Choose from HubSpot</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
                 {hsDeals?.length > 0
                   ? `Pick from ${hsDeals.length} deals in pilots & renewals`
                   : "Connect HubSpot to enable"}
@@ -839,7 +839,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
             </button>
           </div>
           <div style={{ marginTop: 20, textAlign: "right" }}>
-            <button onClick={onClose} style={{ padding: "7px 16px", background: "#334155", color: "#e2e8f0", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            <button onClick={onClose} style={{ padding: "7px 16px", background: "var(--border-strong)", color: "var(--text-body)", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}>Cancel</button>
           </div>
         </div>
       </div>
@@ -851,7 +851,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
     return (
       <div style={overlay} onClick={onClose}>
         <div style={{ ...card, width: 740 }} onClick={e => e.stopPropagation()}>
-          <h3 style={{ color: "#f1f5f9", margin: "0 0 18px", fontSize: 17, fontWeight: 600 }}>Choose from HubSpot</h3>
+          <h3 style={{ color: "var(--text)", margin: "0 0 18px", fontSize: 17, fontWeight: 600 }}>Choose from HubSpot</h3>
           <HubSpotDealPicker
             hsDeals={hsDeals}
             hsPipelines={hsPipelines}
@@ -871,11 +871,11 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
           <button
             onClick={() => mode === "hubspot" ? setHsStep("pick") : setMode(null)}
-            style={{ padding: "4px 10px", background: "#334155", color: "#94a3b8", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13 }}
+            style={{ padding: "4px 10px", background: "var(--border-strong)", color: "var(--text-label)", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13 }}
           >
             ←
           </button>
-          <h3 style={{ color: "#f1f5f9", margin: 0, fontSize: 16, fontWeight: 600 }}>
+          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 16, fontWeight: 600 }}>
             {mode === "hubspot" && selectedHsDeal
               ? `Add from HubSpot: ${selectedHsDeal.properties?.dealname || "Deal"}`
               : "Manual Add"}
@@ -967,13 +967,13 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
             <div style={{ display: "flex", gap: 6, marginBottom: form.useAlgoConfidence ? 0 : 6 }}>
               <button
                 onClick={() => setForm(p => ({ ...p, useAlgoConfidence: false }))}
-                style={{ flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: !form.useAlgoConfidence ? "#6366f1" : "#334155", color: "#fff" }}
+                style={{ flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: !form.useAlgoConfidence ? "#6366f1" : "var(--border-strong)", color: "#fff" }}
               >
                 Manual
               </button>
               <button
                 onClick={() => setForm(p => ({ ...p, useAlgoConfidence: true }))}
-                style={{ flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: form.useAlgoConfidence ? "#6366f1" : "#334155", color: "#fff" }}
+                style={{ flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 12, border: "none", cursor: "pointer", background: form.useAlgoConfidence ? "#6366f1" : "var(--border-strong)", color: "#fff" }}
               >
                 Algorithm
               </button>
@@ -985,7 +985,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
                   onChange={e => setForm(p => ({ ...p, manualConfidence: parseInt(e.target.value) }))}
                   style={{ width: "100%", marginTop: 4 }}
                 />
-                <span style={{ color: "#e2e8f0", fontSize: 12 }}>{form.manualConfidence}%</span>
+                <span style={{ color: "var(--text-body)", fontSize: 12 }}>{form.manualConfidence}%</span>
               </div>
             )}
           </div>
@@ -1016,7 +1016,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
           </div>
         )}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button onClick={onClose} disabled={saving} style={{ padding: "7px 16px", background: "#334155", color: "#e2e8f0", border: "none", borderRadius: 5, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.5 : 1 }}>Cancel</button>
+          <button onClick={onClose} disabled={saving} style={{ padding: "7px 16px", background: "var(--border-strong)", color: "var(--text-body)", border: "none", borderRadius: 5, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.5 : 1 }}>Cancel</button>
           <button
             onClick={handleAdd}
             disabled={!form.name.trim() || saving}
@@ -1071,7 +1071,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
     1
   );
 
-  const tblHdr = { padding: "6px 10px", fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
+  const tblHdr = { padding: "6px 10px", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
 
   function renderMonthSection(key, sectionDeals, label, isPast) {
     const openDeals = sectionDeals.filter(d => !d.closedWon);
@@ -1082,25 +1082,25 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
     const isCurrentMonth = key === thisMonthKey;
     const isCollapsed = collapsed[key] ?? (isPast && key !== thisMonthKey);
 
-    const borderColor = isCurrentMonth ? "#4f46e5" : "#334155";
+    const borderColor = isCurrentMonth ? "#4f46e5" : "var(--border-strong)";
     const headerBg = isCurrentMonth ? "rgba(99,102,241,0.08)" : "transparent";
 
     return (
-      <div key={key} style={{ marginBottom: 10, background: "#1e293b", borderRadius: 10, border: `1px solid ${borderColor}`, overflow: "hidden" }}>
+      <div key={key} style={{ marginBottom: 10, background: "var(--surface)", borderRadius: 10, border: `1px solid ${borderColor}`, overflow: "hidden" }}>
         <div
           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", cursor: "pointer", userSelect: "none", background: headerBg }}
           onClick={() => setCollapsed(p => ({ ...p, [key]: !isCollapsed }))}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
             <span style={{ color: "#475569", fontSize: 11, flexShrink: 0 }}>{isCollapsed ? "▶" : "▼"}</span>
-            <span style={{ fontWeight: 600, fontSize: 14, color: isCurrentMonth ? "#a5b4fc" : isPast ? "#64748b" : "#f1f5f9", flexShrink: 0, minWidth: 120 }}>
+            <span style={{ fontWeight: 600, fontSize: 14, color: isCurrentMonth ? "#a5b4fc" : isPast ? "var(--text-muted)" : "var(--text)", flexShrink: 0, minWidth: 120 }}>
               {label}
               {isCurrentMonth && <span style={{ fontSize: 10, color: "#6366f1", marginLeft: 6 }}>▶ now</span>}
               {isPast && key !== "unscheduled" && !isCurrentMonth && <span style={{ fontSize: 10, color: "#475569", marginLeft: 6 }}>past</span>}
             </span>
             <span style={{ fontSize: 12, color: "#475569", flexShrink: 0 }}>{sectionDeals.length} deal{sectionDeals.length !== 1 ? "s" : ""}</span>
             {barW > 0 && (
-              <div style={{ flex: 1, maxWidth: 180, height: 5, background: "#0f172a", borderRadius: 3, overflow: "hidden", marginLeft: 4 }}>
+              <div style={{ flex: 1, maxWidth: 180, height: 5, background: "var(--surface-deep)", borderRadius: 3, overflow: "hidden", marginLeft: 4 }}>
                 <div style={{
                   width: `${barW}%`, height: "100%", borderRadius: 3,
                   background: isCurrentMonth
@@ -1114,7 +1114,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
             {closedTotal > 0 && (
               <span style={{ color: "#4ade80", fontWeight: 600 }}>{formatCurrency(closedTotal)} closed</span>
             )}
-            <span style={{ color: "#64748b" }}>{pipeline > 0 ? formatCurrency(pipeline) : "—"}</span>
+            <span style={{ color: "var(--text-muted)" }}>{pipeline > 0 ? formatCurrency(pipeline) : "—"}</span>
             <span style={{ color: isCurrentMonth ? "#a5b4fc" : "#a5f3fc", fontWeight: 600, minWidth: 60, textAlign: "right" }}>
               {adjusted > 0 ? formatCurrency(adjusted) : "—"}
             </span>
@@ -1123,7 +1123,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
 
         {!isCollapsed && (
           sectionDeals.length === 0 ? (
-            <p style={{ color: "#334155", fontSize: 13, textAlign: "center", padding: "14px 0", margin: 0, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+            <p style={{ color: "var(--border-strong)", fontSize: 13, textAlign: "center", padding: "14px 0", margin: 0, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
               No deals scheduled here.
             </p>
           ) : (
@@ -1146,7 +1146,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
               <tfoot>
                 <tr style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                   <td style={{ padding: "7px 10px", color: "#475569", fontSize: 12, fontWeight: 600 }}>Subtotal</td>
-                  <td style={{ padding: "7px 10px", color: "#64748b", fontSize: 13, textAlign: "right" }}>{formatCurrency(pipeline)}</td>
+                  <td style={{ padding: "7px 10px", color: "var(--text-muted)", fontSize: 13, textAlign: "right" }}>{formatCurrency(pipeline)}</td>
                   <td></td>
                   <td style={{ padding: "7px 10px", color: "#a5f3fc", fontSize: 13, textAlign: "right", fontWeight: 600 }}>{formatCurrency(adjusted)}</td>
                   <td colSpan={2}></td>
@@ -1161,7 +1161,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
 
   if (deals.length === 0) {
     return (
-      <div style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: "32px 20px", textAlign: "center" }}>
+      <div style={{ background: "var(--surface)", borderRadius: 10, border: "1px solid #334155", padding: "32px 20px", textAlign: "center" }}>
         <p style={{ color: "#475569", fontSize: 14, margin: 0 }}>No deals yet. Click "+ Add to Pipeline" to get started, or import the CSV data.</p>
       </div>
     );
@@ -1197,52 +1197,52 @@ function EventsSection({ events, onAdd, onDelete }) {
   const totalDealValue = events.reduce((s, e) => s + (e.dealValue || 0), 0);
   const overallRate = totalMet > 0 ? ((totalConv / totalMet) * 100).toFixed(1) + "%" : "—";
 
-  const inp = { background: "#0f172a", border: "1px solid #334155", borderRadius: 5, color: "#e2e8f0", padding: "5px 8px", fontSize: 13 };
-  const hdr = { padding: "6px 10px", fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
+  const inp = { background: "var(--surface-deep)", border: "1px solid #334155", borderRadius: 5, color: "var(--text-body)", padding: "5px 8px", fontSize: 13 };
+  const hdr = { padding: "6px 10px", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
 
   return (
-    <div style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: 20, marginTop: 20 }}>
+    <div style={{ background: "var(--surface)", borderRadius: 10, border: "1px solid #334155", padding: 20, marginTop: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div>
-          <h3 style={{ color: "#f1f5f9", margin: 0, fontSize: 15, fontWeight: 600 }}>Event Tracking</h3>
-          <p style={{ color: "#64748b", fontSize: 12, margin: "4px 0 0" }}>
+          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 15, fontWeight: 600 }}>Event Tracking</h3>
+          <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "4px 0 0" }}>
             {events.length} events · {totalMet} contacts · {totalConv} → meeting · {overallRate} conv. · {totalDealsWon} deals closed · {formatCurrency(totalDealValue)}
           </p>
         </div>
-        <button onClick={() => setShowForm(s => !s)} style={{ padding: "5px 14px", background: showForm ? "#334155" : "#6366f1", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}>
+        <button onClick={() => setShowForm(s => !s)} style={{ padding: "5px 14px", background: showForm ? "var(--border-strong)" : "#6366f1", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}>
           {showForm ? "Cancel" : "+ Add Event"}
         </button>
       </div>
 
       {showForm && (
-        <div style={{ background: "#0f172a", borderRadius: 8, padding: 16, marginBottom: 14, border: "1px solid #1e293b" }}>
+        <div style={{ background: "var(--surface-deep)", borderRadius: 8, padding: 16, marginBottom: 14, border: "1px solid #1e293b" }}>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Event Name</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Event Name</label>
               <input style={{ ...inp, width: 160 }} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. FETC 2026" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Date</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Date</label>
               <input type="date" style={inp} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>People Met</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>People Met</label>
               <input type="number" min={0} style={{ ...inp, width: 85 }} value={form.peopleMet} onChange={e => setForm(p => ({ ...p, peopleMet: parseInt(e.target.value) || 0 }))} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>→ Meeting</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>→ Meeting</label>
               <input type="number" min={0} style={{ ...inp, width: 85 }} value={form.convertedToMeeting} onChange={e => setForm(p => ({ ...p, convertedToMeeting: parseInt(e.target.value) || 0 }))} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Deals Closed</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Deals Closed</label>
               <input type="number" min={0} style={{ ...inp, width: 85 }} value={form.dealsWon} onChange={e => setForm(p => ({ ...p, dealsWon: parseInt(e.target.value) || 0 }))} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Deal Value ($)</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Deal Value ($)</label>
               <input type="number" min={0} style={{ ...inp, width: 110 }} value={form.dealValue} onChange={e => setForm(p => ({ ...p, dealValue: parseFloat(e.target.value) || 0 }))} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Notes</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Notes</label>
               <input style={{ ...inp, width: 180 }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
@@ -1267,16 +1267,16 @@ function EventsSection({ events, onAdd, onDelete }) {
               const rateGood = ev.peopleMet > 0 && (ev.convertedToMeeting / ev.peopleMet) >= 0.15;
               return (
                 <tr key={ev.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  <td style={{ padding: "8px 10px", color: "#e2e8f0", fontSize: 13, fontWeight: 500 }}>{ev.name}</td>
-                  <td style={{ padding: "8px 10px", color: "#94a3b8", fontSize: 13 }}>
+                  <td style={{ padding: "8px 10px", color: "var(--text-body)", fontSize: 13, fontWeight: 500 }}>{ev.name}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-label)", fontSize: 13 }}>
                     {ev.date ? new Date(ev.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#e2e8f0", fontSize: 13, textAlign: "center" }}>{ev.peopleMet}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-body)", fontSize: 13, textAlign: "center" }}>{ev.peopleMet}</td>
                   <td style={{ padding: "8px 10px", color: "#a5f3fc", fontSize: 13, textAlign: "center" }}>{ev.convertedToMeeting}</td>
                   <td style={{ padding: "8px 10px", fontSize: 13, textAlign: "center", color: rateGood ? "#4ade80" : "#fbbf24" }}>{rate}</td>
                   <td style={{ padding: "8px 10px", color: "#4ade80", fontSize: 13, textAlign: "center" }}>{ev.dealsWon || 0}</td>
                   <td style={{ padding: "8px 10px", color: "#a5f3fc", fontSize: 13, textAlign: "center" }}>{ev.dealValue ? formatCurrency(ev.dealValue) : "—"}</td>
-                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 12 }}>{ev.notes || "—"}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12 }}>{ev.notes || "—"}</td>
                   <td style={{ padding: "8px 10px", textAlign: "right" }}>
                     <button onClick={() => onDelete(ev.id)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 16, lineHeight: 1 }} title="Delete">×</button>
                   </td>
@@ -1310,40 +1310,40 @@ function OutboundActuals({ actuals, onAdd, onDelete }) {
   const showRate   = totBooked  > 0 ? ((totHeld   / totBooked)  * 100).toFixed(1) + "%" : "—";
   const dealRate   = totHeld    > 0 ? ((totDeals  / totHeld)    * 100).toFixed(1) + "%" : "—";
 
-  const inp = { background: "#0f172a", border: "1px solid #334155", borderRadius: 5, color: "#e2e8f0", padding: "5px 8px", fontSize: 13 };
-  const hdr = { padding: "6px 10px", fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
+  const inp = { background: "var(--surface-deep)", border: "1px solid #334155", borderRadius: 5, color: "var(--text-body)", padding: "5px 8px", fontSize: 13 };
+  const hdr = { padding: "6px 10px", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
 
   const sorted = [...actuals].sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""));
 
   return (
-    <div style={{ background: "#1e293b", borderRadius: 10, border: "1px solid #334155", padding: 20, marginTop: 20 }}>
+    <div style={{ background: "var(--surface)", borderRadius: 10, border: "1px solid #334155", padding: 20, marginTop: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div>
-          <h3 style={{ color: "#f1f5f9", margin: 0, fontSize: 15, fontWeight: 600 }}>Outbound Actuals</h3>
-          <p style={{ color: "#64748b", fontSize: 12, margin: "4px 0 0" }}>
+          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 15, fontWeight: 600 }}>Outbound Actuals</h3>
+          <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "4px 0 0" }}>
             {totTouches} touches → {totBooked} booked ({bookRate}) → {totHeld} held ({showRate}) → {totDeals} deals ({dealRate})
           </p>
         </div>
-        <button onClick={() => setShowForm(s => !s)} style={{ padding: "5px 14px", background: showForm ? "#334155" : "#6366f1", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}>
+        <button onClick={() => setShowForm(s => !s)} style={{ padding: "5px 14px", background: showForm ? "var(--border-strong)" : "#6366f1", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 13 }}>
           {showForm ? "Cancel" : "+ Log Week"}
         </button>
       </div>
 
       {showForm && (
-        <div style={{ background: "#0f172a", borderRadius: 8, padding: 16, marginBottom: 14, border: "1px solid #1e293b" }}>
+        <div style={{ background: "var(--surface-deep)", borderRadius: 8, padding: 16, marginBottom: 14, border: "1px solid #1e293b" }}>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Week of</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Week of</label>
               <input type="date" style={inp} value={form.weekOf} onChange={e => setForm(p => ({ ...p, weekOf: e.target.value }))} />
             </div>
             {[["Touches", "touches"], ["Mtgs Booked", "meetingsBooked"], ["Mtgs Held", "meetingsHeld"], ["Deals", "dealsCreated"]].map(([label, key]) => (
               <div key={key}>
-                <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>{label}</label>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>{label}</label>
                 <input type="number" min={0} style={{ ...inp, width: 85 }} value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: parseInt(e.target.value) || 0 }))} />
               </div>
             ))}
             <div>
-              <label style={{ fontSize: 11, color: "#94a3b8", display: "block", marginBottom: 3 }}>Notes</label>
+              <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Notes</label>
               <input style={{ ...inp, width: 170 }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
@@ -1369,17 +1369,17 @@ function OutboundActuals({ actuals, onAdd, onDelete }) {
               const dR = a.meetingsHeld > 0   ? ((a.dealsCreated   / a.meetingsHeld)   * 100).toFixed(1) + "%" : "—";
               return (
                 <tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  <td style={{ padding: "8px 10px", color: "#e2e8f0", fontSize: 13 }}>
+                  <td style={{ padding: "8px 10px", color: "var(--text-body)", fontSize: 13 }}>
                     {a.weekOf ? new Date(a.weekOf + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#e2e8f0", fontSize: 13, textAlign: "center" }}>{a.touches}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-body)", fontSize: 13, textAlign: "center" }}>{a.touches}</td>
                   <td style={{ padding: "8px 10px", color: "#a5f3fc", fontSize: 13, textAlign: "center" }}>{a.meetingsBooked}</td>
-                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 12, textAlign: "center" }}>{bR}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12, textAlign: "center" }}>{bR}</td>
                   <td style={{ padding: "8px 10px", color: "#a5f3fc", fontSize: 13, textAlign: "center" }}>{a.meetingsHeld}</td>
-                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 12, textAlign: "center" }}>{sR}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12, textAlign: "center" }}>{sR}</td>
                   <td style={{ padding: "8px 10px", color: "#4ade80", fontSize: 13, textAlign: "center" }}>{a.dealsCreated}</td>
-                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 12, textAlign: "center" }}>{dR}</td>
-                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 12 }}>{a.notes || "—"}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12, textAlign: "center" }}>{dR}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12 }}>{a.notes || "—"}</td>
                   <td style={{ padding: "8px 10px", textAlign: "right" }}>
                     <button onClick={() => onDelete(a.id)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 16, lineHeight: 1 }} title="Delete">×</button>
                   </td>
@@ -1646,16 +1646,16 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
     { id: "uniqlearn",  label: "UniqLearn", color: "#0ea5e9" },
     { id: "uniqpath",   label: "UniqPath",  color: "#a855f7" },
     { id: "both",       label: "Both",      color: "#f59e0b" },
-    { id: "unassigned", label: "Unassigned", color: "#64748b" },
+    { id: "unassigned", label: "Unassigned", color: "var(--text-muted)" },
   ];
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "28px 28px 60px", background: "#09090e", color: "#e2e8f0", minWidth: 0 }}>
+    <div style={{ flex: 1, overflowY: "auto", padding: "28px 28px 60px", background: "var(--bg)", color: "var(--text-body)", minWidth: 0 }}>
       {/* Page header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#f1f5f9", letterSpacing: "-0.3px" }}>Pipeline Tracker</h2>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>Live deal tracking · month-by-month view · confidence scoring</p>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.3px" }}>Pipeline Tracker</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-muted)" }}>Live deal tracking · month-by-month view · confidence scoring</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {syncMsg && (
@@ -1694,13 +1694,13 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
       <div style={{ display: "flex", gap: 14, marginBottom: 24, flexWrap: "wrap" }}>
         {[
           { label: "Closed Won",           value: totalClosedWon > 0 ? formatCurrency(totalClosedWon) : "—", color: "#4ade80", sub: `${closedDeals.length} deal${closedDeals.length !== 1 ? "s" : ""}`, border: "#166534" },
-          { label: "Pipeline Value",       value: formatCurrency(totalPipeline),   color: "#e2e8f0", sub: `${openDeals.length} open deals` },
+          { label: "Pipeline Value",       value: formatCurrency(totalPipeline),   color: "var(--text-body)", sub: `${openDeals.length} open deals` },
           { label: "Confidence-Adjusted",  value: formatCurrency(totalAdjusted),   color: "#a5f3fc", sub: `${totalPipeline > 0 ? Math.round((totalAdjusted / totalPipeline) * 100) : 0}% of pipeline` },
           { label: "This Month",           value: thisMonthAdj > 0 ? formatCurrency(thisMonthAdj) : "—", color: "#818cf8", sub: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }) },
           { label: "Next Month",           value: nextMonthAdj > 0 ? formatCurrency(nextMonthAdj) : "—", color: "#fbbf24", sub: nextMonthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }) },
         ].map(card => (
-          <div key={card.label} style={{ background: "#1e293b", border: `1px solid ${card.border || "#334155"}`, borderRadius: 10, padding: "14px 20px", flex: "1 1 140px", minWidth: 130 }}>
-            <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>{card.label}</div>
+          <div key={card.label} style={{ background: "var(--surface)", border: `1px solid ${card.border || "var(--border-strong)"}`, borderRadius: 10, padding: "14px 20px", flex: "1 1 140px", minWidth: 130 }}>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>{card.label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: card.color }}>{card.value}</div>
             {card.sub && <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{card.sub}</div>}
           </div>
@@ -1722,7 +1722,7 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
               style={{
                 padding: "8px 18px", fontSize: 13, cursor: "pointer",
                 background: "none", border: "none", borderBottom: active ? "2px solid #6366f1" : "2px solid transparent",
-                color: active ? "#a5b4fc" : "#64748b", fontWeight: active ? 600 : 400,
+                color: active ? "#a5b4fc" : "var(--text-muted)", fontWeight: active ? 600 : 400,
                 marginBottom: -1, transition: "color 0.15s",
               }}
             >
@@ -1751,8 +1751,8 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
                   width: "100%", boxSizing: "border-box",
                   paddingLeft: 32, paddingRight: searchQuery ? 28 : 10,
                   paddingTop: 7, paddingBottom: 7,
-                  background: "#1e293b", border: "1px solid #334155",
-                  borderRadius: 7, color: "#e2e8f0", fontSize: 13,
+                  background: "var(--surface)", border: "1px solid #334155",
+                  borderRadius: 7, color: "var(--text-body)", fontSize: 13,
                 }}
               />
               {searchQuery && (
@@ -1772,8 +1772,8 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
                     style={{
                       padding: "5px 13px", fontSize: 12, borderRadius: 6, cursor: "pointer", fontWeight: active ? 600 : 400,
                       border: active ? `1px solid ${f.color || "#6366f1"}` : "1px solid #334155",
-                      background: active ? (f.color ? f.color + "22" : "rgba(99,102,241,0.15)") : "#1e293b",
-                      color: active ? (f.color || "#a5b4fc") : "#94a3b8",
+                      background: active ? (f.color ? f.color + "22" : "rgba(99,102,241,0.15)") : "var(--surface)",
+                      color: active ? (f.color || "#a5b4fc") : "var(--text-label)",
                     }}
                   >{f.label}</button>
                 );

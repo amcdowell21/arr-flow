@@ -31,7 +31,7 @@ const PROD_COLOR = {
   uniqlearn: "#0ea5e9",
   uniqpath: "#a855f7",
   both: "#f59e0b",
-  "": "#64748b",
+  "": "var(--text-muted)",
 };
 
 const PROD_LABEL = {
@@ -172,12 +172,12 @@ function MonthlyForecastChart({ deals }) {
   }));
 
   return (
-    <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "18px 16px 14px" }}>
+    <div style={{ background: "var(--surface)", border: "1px solid #334155", borderRadius: 10, padding: "18px 16px 14px" }}>
       <div style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
           Revenue Forecast
         </h3>
-        <p style={{ margin: "3px 0 0", fontSize: 11, color: "#64748b" }}>
+        <p style={{ margin: "3px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
           Monthly pipeline · confidence-adjusted · Jan {now.getFullYear()} onward · live
         </p>
       </div>
@@ -188,7 +188,7 @@ function MonthlyForecastChart({ deals }) {
           {yTicks.map(({ val, y }) => (
             <g key={y}>
               <line x1={0} y1={y} x2={PW} y2={y} stroke="#1f2f47" strokeDasharray="4,3" />
-              <text x={-6} y={y + 4} textAnchor="end" fontSize={9} fill="#475569">{fmt(val)}</text>
+              <text x={-6} y={y + 4} textAnchor="end" fontSize={9} fill="var(--text-muted)">{fmt(val)}</text>
             </g>
           ))}
 
@@ -208,9 +208,9 @@ function MonthlyForecastChart({ deals }) {
             const topBarH = Math.max(pipelineH + wonH, adjH + wonH);
             const tipY = Math.max(4, PH - topBarH - 80);
             const tipLines = [
-              { text: monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }), color: "#f1f5f9", fw: 600 },
+              { text: monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }), color: "var(--text)", fw: 600 },
               { text: `Adj forecast: ${fmt(m.adjusted)}`, color: "#a5f3fc", fw: 400 },
-              { text: `Pipeline: ${fmt(m.pipeline)} · ${m.count} deal${m.count !== 1 ? "s" : ""}`, color: "#94a3b8", fw: 400 },
+              { text: `Pipeline: ${fmt(m.pipeline)} · ${m.count} deal${m.count !== 1 ? "s" : ""}`, color: "var(--text-label)", fw: 400 },
               ...(m.closedWon > 0 ? [{ text: `Closed won: ${fmt(m.closedWon)}`, color: "#4ade80", fw: 400 }] : []),
             ];
 
@@ -255,7 +255,7 @@ function MonthlyForecastChart({ deals }) {
 
                 {/* X-axis labels */}
                 <text x={cx} y={PH + 16} textAnchor="middle" fontSize={9}
-                  fill={isCurrent ? "#a5b4fc" : "#475569"}
+                  fill={isCurrent ? "#a5b4fc" : "var(--text-muted)"}
                   fontWeight={isCurrent ? "600" : "400"}>
                   {monthDate.toLocaleDateString("en-US", { month: "short" })}
                 </text>
@@ -267,7 +267,7 @@ function MonthlyForecastChart({ deals }) {
                 {isHov && (
                   <g>
                     <rect x={tipX - 58} y={tipY} width={116} height={tipLines.length * 14 + 12}
-                      rx={5} fill="#0a1628" stroke="#334155" strokeWidth={1} />
+                      rx={5} fill="var(--surface-deep)" stroke="var(--border-strong)" strokeWidth={1} />
                     {tipLines.map((l, li) => (
                       <text key={li} x={tipX} y={tipY + 14 + li * 14}
                         textAnchor="middle" fontSize={9.5}
@@ -282,15 +282,15 @@ function MonthlyForecastChart({ deals }) {
           })}
 
           {/* X axis line */}
-          <line x1={0} y1={PH} x2={PW} y2={PH} stroke="#334155" />
+          <line x1={0} y1={PH} x2={PW} y2={PH} stroke="var(--border-strong)" />
         </g>
       </svg>
 
       {/* Legend */}
-      <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#475569", marginTop: 4, paddingLeft: P.l }}>
+      <div style={{ display: "flex", gap: 16, fontSize: 11, color: "var(--text-muted)", marginTop: 4, paddingLeft: P.l }}>
         {[
           { color: "#38bdf8", label: "Adj. Forecast" },
-          { color: "rgba(255,255,255,0.12)", label: "Pipeline", border: "#334155" },
+          { color: "rgba(255,255,255,0.12)", label: "Pipeline", border: "var(--border-strong)" },
           { color: "#4ade80", label: "Closed Won" },
         ].map(({ color, label, border }) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -334,12 +334,12 @@ function ProductBreakdownChart({ deals }) {
   const rowH = 40;
 
   return (
-    <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "18px 16px 14px" }}>
+    <div style={{ background: "var(--surface)", border: "1px solid #334155", borderRadius: 10, padding: "18px 16px 14px" }}>
       <div style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
           Pipeline by Product
         </h3>
-        <p style={{ margin: "3px 0 0", fontSize: 11, color: "#64748b" }}>
+        <p style={{ margin: "3px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
           Open deals grouped by product line
         </p>
       </div>
@@ -361,7 +361,7 @@ function ProductBreakdownChart({ deals }) {
               >
                 {/* Product label */}
                 <text x={-8} y={y + bH / 2 + 4} textAnchor="end" fontSize={11}
-                  fill={isHov ? "#f1f5f9" : "#94a3b8"} fontWeight={isHov ? "600" : "400"}>
+                  fill={isHov ? "var(--text)" : "var(--text-label)"} fontWeight={isHov ? "600" : "400"}>
                   {g.label}
                 </text>
 
@@ -383,9 +383,9 @@ function ProductBreakdownChart({ deals }) {
 
                 {/* Right-side value labels */}
                 <text x={Math.max(pipelineW, 2) + 8} y={y + bH / 2 + 4}
-                  fontSize={10} fill="#64748b">
+                  fontSize={10} fill="var(--text-muted)">
                   {fmt(g.adjusted)}
-                  {g.count > 0 && <tspan fill="#334155"> · {g.count}</tspan>}
+                  {g.count > 0 && <tspan fill="var(--border-strong)"> · {g.count}</tspan>}
                 </text>
 
                 {g.closedWon > 0 && (
@@ -408,16 +408,16 @@ function ProductBreakdownChart({ deals }) {
         return (
           <div style={{ borderTop: "1px solid #334155", marginTop: 4, paddingTop: 10, display: "flex", gap: 20, paddingLeft: P.l, fontSize: 11 }}>
             <div>
-              <span style={{ color: "#475569" }}>Pipeline: </span>
+              <span style={{ color: "var(--text-muted)" }}>Pipeline: </span>
               <span style={{ color: "#e2e8f0", fontWeight: 600 }}>{fmt(totalPipeline)}</span>
             </div>
             <div>
-              <span style={{ color: "#475569" }}>Adjusted: </span>
+              <span style={{ color: "var(--text-muted)" }}>Adjusted: </span>
               <span style={{ color: "#a5f3fc", fontWeight: 600 }}>{fmt(totalAdj)}</span>
             </div>
             {totalWon > 0 && (
               <div>
-                <span style={{ color: "#475569" }}>Won: </span>
+                <span style={{ color: "var(--text-muted)" }}>Won: </span>
                 <span style={{ color: "#4ade80", fontWeight: 600 }}>{fmt(totalWon)}</span>
               </div>
             )}
@@ -473,7 +473,7 @@ function USDealsMap({ deals }) {
     const prods = stateData[abbr]?.products || {};
     let dominant = "", maxV = 0;
     Object.entries(prods).forEach(([p, v]) => { if (v > maxV) { maxV = v; dominant = p; } });
-    return PROD_COLOR[dominant] || "#64748b";
+    return PROD_COLOR[dominant] || "var(--text-muted)";
   }
 
   function bubbleR(abbr) {
@@ -488,19 +488,19 @@ function USDealsMap({ deals }) {
   const VIEW = "-65 5 1045 615";
 
   return (
-    <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "18px 16px 14px", marginTop: 16 }}>
+    <div style={{ background: "var(--surface)", border: "1px solid #334155", borderRadius: 10, padding: "18px 16px 14px", marginTop: 16 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
             Deal Coverage · US Map
           </h3>
-          <p style={{ margin: "3px 0 0", fontSize: 11, color: "#64748b" }}>
+          <p style={{ margin: "3px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
             {statesWithDeals.length} state{statesWithDeals.length !== 1 ? "s" : ""} with active deals ·
             hover for details · set state in deal editor
           </p>
         </div>
-        <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#64748b", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
           {Object.entries(PROD_LABEL).map(([k, v]) => (
             <div key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <div style={{ width: 9, height: 9, borderRadius: "50%", background: PROD_COLOR[k] }} />
@@ -513,7 +513,7 @@ function USDealsMap({ deals }) {
       <div style={{ position: "relative" }}>
         <svg width="100%" viewBox={VIEW} style={{ display: "block" }}>
           {/* Map background */}
-          <rect x="-65" y="5" width="1045" height="615" rx={8} fill="#0b1526" />
+          <rect x="-65" y="5" width="1045" height="615" rx={8} fill="var(--surface-deep)" />
 
           {/* ── Geographic state fills ── */}
           {Object.entries(statePaths).map(([abbr, path]) => {
@@ -543,7 +543,7 @@ function USDealsMap({ deals }) {
 
           {/* Loading / error states */}
           {!mapData && !mapError && (
-            <text x="487" y="310" textAnchor="middle" fontSize={14} fill="#334155">
+            <text x="487" y="310" textAnchor="middle" fontSize={14} fill="var(--border-strong)">
               Loading map…
             </text>
           )}
@@ -608,9 +608,9 @@ function USDealsMap({ deals }) {
             return (
               <g style={{ pointerEvents: "none" }}>
                 <rect x={tipX} y={tipY} width={tipW} height={tipH}
-                  rx={5} fill="#0a1628" stroke="#3d5a82" strokeWidth={1} />
+                  rx={5} fill="var(--surface-deep)" stroke="#3d5a82" strokeWidth={1} />
                 <text x={tipX + tipW / 2} y={tipY + 16} textAnchor="middle"
-                  fontSize={11} fill="#f1f5f9" fontWeight="600">
+                  fontSize={11} fill="var(--text)" fontWeight="600">
                   {abbr} — {PROD_LABEL[dominantProduct] || "Mixed"}
                 </text>
                 <text x={tipX + tipW / 2} y={tipY + 31} textAnchor="middle"
@@ -618,11 +618,11 @@ function USDealsMap({ deals }) {
                   Adj forecast: {fmt(data.adjusted)}
                 </text>
                 <text x={tipX + tipW / 2} y={tipY + 46} textAnchor="middle"
-                  fontSize={9.5} fill="#94a3b8">
+                  fontSize={9.5} fill="var(--text-label)">
                   Pipeline: {fmt(data.pipeline)}
                 </text>
                 <text x={tipX + tipW / 2} y={tipY + 61} textAnchor="middle"
-                  fontSize={9.5} fill="#64748b">
+                  fontSize={9.5} fill="var(--text-muted)">
                   {data.count} deal{data.count !== 1 ? "s" : ""}
                 </text>
                 {data.closedWon > 0 && (
@@ -643,8 +643,8 @@ function USDealsMap({ deals }) {
             alignItems: "center", justifyContent: "center", pointerEvents: "none",
           }}>
             <div style={{ background: "rgba(10,18,36,0.88)", padding: "14px 22px", borderRadius: 8, border: "1px solid #334155", textAlign: "center" }}>
-              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>No state data yet</div>
-              <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>No state data yet</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.6 }}>
                 Edit any deal and set its State field<br />to see it appear on the map.
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { ThemeProvider, useTheme } from "./ThemeContext";
 import html2canvas from "html2canvas";
 import { db, auth } from "./firebase";
 import {
@@ -273,6 +274,7 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [showHsInput, setShowHsInput] = useState(false);
   const [scenariosOpen, setScenariosOpen] = useState(view === "main");
+  const { isDark, toggle } = useTheme();
 
   const isConnected = hs.deals.length > 0;
 
@@ -339,8 +341,8 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
 
   return (
     <div style={{
-      width: 220, flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.07)",
-      background: "rgba(255,255,255,0.015)", display: "flex", flexDirection: "column",
+      width: 220, flexShrink: 0, borderRight: "1px solid var(--border)",
+      background: "var(--surface-deep)", display: "flex", flexDirection: "column",
       height: "100vh", position: "sticky", top: 0,
     }}>
       {/* App header / home link */}
@@ -348,21 +350,21 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
         onClick={() => onNavigate("home")}
         style={{
           display: "flex", alignItems: "center", gap: 10,
-          padding: "18px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)",
-          background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.07)",
+          padding: "18px 16px", borderBottom: "1px solid var(--border)",
+          background: "transparent", border: "none", borderBottom: "1px solid var(--border)",
           cursor: "pointer", width: "100%", textAlign: "left",
         }}
       >
         <img src="/arr-flow-logo.png" alt="ARR Flow" style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }} />
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", lineHeight: 1.2 }}>ARR Flow</div>
-          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", fontFamily: "'DM Mono',monospace", letterSpacing: "0.08em" }}>Revenue Intelligence</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", lineHeight: 1.2 }}>ARR Flow</div>
+          <div style={{ fontSize: 9, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace", letterSpacing: "0.08em" }}>Revenue Intelligence</div>
         </div>
       </button>
 
       {/* Nav items */}
       <div style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
-        <div style={{ fontSize: 9, fontFamily: "'DM Mono',monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.18)", padding: "6px 8px 8px" }}>
+        <div style={{ fontSize: 9, fontFamily: "'DM Mono',monospace", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-faint)", padding: "6px 8px 8px" }}>
           Workspace
         </div>
         {allNavItems.map(item => {
@@ -381,21 +383,21 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
                   borderRadius: 8, padding: "9px 10px", cursor: "pointer", transition: "all 0.15s",
                   marginBottom: 2,
                 }}
-                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "var(--hover-bg)"; e.currentTarget.style.borderColor = "var(--border)"; }}}
                 onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}}
               >
                 {item.icon(active)}
-                <span style={{ fontSize: 12, fontWeight: 500, color: active ? "#fff" : "rgba(255,255,255,0.45)", flex: 1, textAlign: "left" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: active ? "var(--text)" : "var(--text-label)", flex: 1, textAlign: "left" }}>
                   {item.label}
                 </span>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0, opacity: 0.3, transition: "transform 0.2s", transform: (item.hasDropdown && active && scenariosOpen) ? "rotate(90deg)" : "none" }}>
-                  <path d="M3 1.5L7 5 3 8.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0, opacity: 0.4, transition: "transform 0.2s", transform: (item.hasDropdown && active && scenariosOpen) ? "rotate(90deg)" : "none" }}>
+                  <path d="M3 1.5L7 5 3 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
 
               {/* Scenarios dropdown under Input Metrics */}
               {item.hasDropdown && active && scenariosOpen && (
-                <div style={{ marginLeft: 8, marginBottom: 6, paddingLeft: 10, borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
+                <div style={{ marginLeft: 8, marginBottom: 6, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
                   {/* Save input */}
                   <div style={{ padding: "8px 4px 6px", display: "flex", gap: 5 }}>
                     <input
@@ -404,8 +406,8 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
                       onKeyDown={e => e.key === "Enter" && handleSave()}
                       placeholder="Save scenario…"
                       style={{
-                        flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 6, padding: "5px 8px", fontSize: 10, color: "#fff", outline: "none",
+                        flex: 1, background: "var(--input-bg)", border: "1px solid var(--input-border)",
+                        borderRadius: 6, padding: "5px 8px", fontSize: 10, color: "var(--text)", outline: "none",
                         fontFamily: "'DM Sans',sans-serif",
                       }}
                     />
@@ -413,10 +415,10 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
                       onClick={handleSave}
                       disabled={!name.trim() || saving}
                       style={{
-                        background: name.trim() ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
-                        border: `1px solid ${name.trim() ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.07)"}`,
+                        background: name.trim() ? "rgba(99,102,241,0.2)" : "var(--input-bg)",
+                        border: `1px solid ${name.trim() ? "rgba(99,102,241,0.45)" : "var(--border)"}`,
                         borderRadius: 6, padding: "5px 8px", cursor: name.trim() ? "pointer" : "default",
-                        color: name.trim() ? "#a5b4fc" : "rgba(255,255,255,0.18)", fontSize: 10, fontWeight: 600,
+                        color: name.trim() ? "#a5b4fc" : "var(--text-faint)", fontSize: 10, fontWeight: 600,
                         fontFamily: "'DM Mono',monospace", transition: "all 0.15s", flexShrink: 0,
                       }}
                     >{saving ? "…" : "Save"}</button>
@@ -424,15 +426,15 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
 
                   {/* Scenario list */}
                   {loading && (
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontFamily: "'DM Mono',monospace", padding: "6px 4px" }}>Loading…</div>
+                    <div style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace", padding: "6px 4px" }}>Loading…</div>
                   )}
                   {!loading && scenarios.length === 0 && (
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.18)", fontFamily: "'DM Mono',monospace", padding: "6px 4px", lineHeight: 1.5 }}>No scenarios yet.</div>
+                    <div style={{ fontSize: 10, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace", padding: "6px 4px", lineHeight: 1.5 }}>No scenarios yet.</div>
                   )}
                   {scenarios.map(s => (
-                    <div key={s.id} style={{ borderRadius: 7, padding: "7px 8px", marginBottom: 3, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", position: "relative" }}>
+                    <div key={s.id} style={{ borderRadius: 7, padding: "7px 8px", marginBottom: 3, background: "var(--input-bg)", border: "1px solid var(--border)", position: "relative" }}>
                       <div onClick={() => onLoad(s)} style={{ cursor: "pointer", paddingRight: 18 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.8)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-body)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
                         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: "#6ee7b7" }}>
                           {formatCurrency((s.ob && s.ip && s.pd)
                             ? (computeOutbound(s.ob).weeklyArr + computeInPerson(s.ip).weeklyArr + computePodcast(s.pd).weeklyArr) * 52
@@ -447,14 +449,14 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
                             Delete
                           </button>
                           <button onClick={() => setConfirmDelete(null)}
-                            style={{ flex: 1, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 0", fontSize: 9, color: "rgba(255,255,255,0.35)", cursor: "pointer", fontFamily: "'DM Mono',monospace" }}>
+                            style={{ flex: 1, background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 4, padding: "2px 0", fontSize: 9, color: "var(--text-label)", cursor: "pointer", fontFamily: "'DM Mono',monospace" }}>
                             Cancel
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={e => { e.stopPropagation(); setConfirmDelete(s.id); }}
-                          style={{ position: "absolute", top: 6, right: 6, background: "transparent", border: "none", padding: 2, cursor: "pointer", color: "rgba(255,255,255,0.15)", lineHeight: 1 }}
+                          style={{ position: "absolute", top: 6, right: 6, background: "transparent", border: "none", padding: 2, cursor: "pointer", color: "var(--text-faint)", lineHeight: 1 }}
                         >
                           <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                         </button>
@@ -469,18 +471,18 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
       </div>
 
       {/* HubSpot token at bottom */}
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "12px" }}>
+      <div style={{ borderTop: "1px solid var(--border)", padding: "12px" }}>
         {isConnected && !showHsInput ? (
           <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 2px" }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 5px rgba(52,211,153,0.6)", flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: "#6ee7b7", fontFamily: "'DM Mono',monospace" }}>HubSpot Connected</div>
-              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", fontFamily: "'DM Mono',monospace" }}>
+              <div style={{ fontSize: 9, color: "var(--text-faint)", fontFamily: "'DM Mono',monospace" }}>
                 {hs.syncing ? "Syncing…" : `${hs.deals.length} deals`}
               </div>
             </div>
             <button onClick={() => setShowHsInput(true)} title="Change token"
-              style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: 2, lineHeight: 1 }}>
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 2, lineHeight: 1 }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.5 2.5l.7.7M8.8 8.8l.7.7M2.5 9.5l.7-.7M8.8 3.2l.7-.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                 <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
@@ -490,10 +492,10 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
-              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)" }}>HubSpot Token</span>
+              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)" }}>HubSpot Token</span>
               {isConnected && (
                 <button onClick={() => setShowHsInput(false)}
-                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.3)", padding: 2, lineHeight: 1 }}>
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 2, lineHeight: 1 }}>
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                 </button>
               )}
@@ -506,8 +508,8 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
                 onKeyDown={e => e.key === "Enter" && hs.onSync()}
                 placeholder="pat-na1-…"
                 style={{
-                  flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
-                  borderRadius: 6, padding: "5px 8px", fontSize: 10, color: "#fff", outline: "none",
+                  flex: 1, background: "var(--input-bg)", border: "1px solid var(--input-border)",
+                  borderRadius: 6, padding: "5px 8px", fontSize: 10, color: "var(--text)", outline: "none",
                   fontFamily: "'DM Mono',monospace",
                 }}
               />
@@ -515,11 +517,11 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
                 onClick={hs.onSync}
                 disabled={!hs.token.trim() || hs.syncing}
                 style={{
-                  background: hs.token.trim() ? "rgba(52,211,153,0.16)" : "rgba(255,255,255,0.03)",
-                  border: `1px solid ${hs.token.trim() ? "rgba(52,211,153,0.38)" : "rgba(255,255,255,0.07)"}`,
+                  background: hs.token.trim() ? "rgba(52,211,153,0.16)" : "var(--input-bg)",
+                  border: `1px solid ${hs.token.trim() ? "rgba(52,211,153,0.38)" : "var(--border)"}`,
                   borderRadius: 6, padding: "5px 9px",
                   cursor: hs.token.trim() && !hs.syncing ? "pointer" : "default",
-                  color: hs.token.trim() ? "#6ee7b7" : "rgba(255,255,255,0.18)",
+                  color: hs.token.trim() ? "#6ee7b7" : "var(--text-faint)",
                   fontSize: 10, fontWeight: 600, fontFamily: "'DM Mono',monospace", transition: "all 0.15s", flexShrink: 0,
                 }}
               >{hs.syncing ? "…" : "Sync"}</button>
@@ -529,20 +531,48 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
         )}
       </div>
 
+      {/* Theme toggle */}
+      <div style={{ borderTop: "1px solid var(--border)", padding: "8px 12px" }}>
+        <button
+          onClick={toggle}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 8,
+            background: "transparent", border: "1px solid var(--border)",
+            borderRadius: 8, padding: "7px 10px", cursor: "pointer", transition: "all 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--hover-bg)"}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+        >
+          {isDark ? (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="2.8" stroke="var(--text-muted)" strokeWidth="1.3"/>
+              <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M10 10l1.1 1.1M2.9 11.1l1.1-1.1M10 4l1.1-1.1" stroke="var(--text-muted)" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M9 2a6 6 0 1 0 3 3 4.5 4.5 0 0 1-3-3z" stroke="var(--text-muted)" strokeWidth="1.3" strokeLinejoin="round"/>
+            </svg>
+          )}
+          <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'DM Mono',monospace" }}>
+            {isDark ? "Light mode" : "Dark mode"}
+          </span>
+        </button>
+      </div>
+
       {/* User info + sign out */}
       {currentUser && (
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 10, color: "var(--text-label)", fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {currentUser.email}
             </div>
           </div>
           <button
             onClick={() => signOut(auth)}
             title="Sign out"
-            style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: 4, lineHeight: 1, flexShrink: 0, borderRadius: 4, transition: "color 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.5)"}
-            onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, lineHeight: 1, flexShrink: 0, borderRadius: 4, transition: "color 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.color = "var(--text)"}
+            onMouseLeave={e => e.currentTarget.style.color = "var(--text-muted)"}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M8 4l3 3-3 3M11 7H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
@@ -715,7 +745,7 @@ function DealDetailModal({ deal, pipelines, token, onClose }) {
         {/* Header */}
         <div style={{ padding:"22px 24px 18px", borderBottom:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"flex-start", gap:14 }}>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:17, fontWeight:700, color:"#f1f5f9", lineHeight:1.3, marginBottom:6 }}>
+            <div style={{ fontSize:17, fontWeight:700, color:"var(--text)", lineHeight:1.3, marginBottom:6 }}>
               {p.dealname || "Untitled Deal"}
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -925,7 +955,7 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
                   width: 18, height: 18, borderRadius: "50%",
                   background: dotColor, opacity: 0.7,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 9, fontWeight: 700, color: "#09090e", fontFamily: "'DM Mono',monospace",
+                  fontSize: 9, fontWeight: 700, color: "var(--bg)", fontFamily: "'DM Mono',monospace",
                 }}>
                   {stageDeals.length}
                 </div>
@@ -1096,7 +1126,7 @@ function HubSpotPage({ hs }) {
                     fontFamily:"'DM Mono',monospace", cursor:"pointer", transition:"all 0.15s",
                     background: boardView === opt.value ? "rgba(255,255,255,0.1)" : "transparent",
                     border: "none",
-                    color: boardView === opt.value ? "#f1f5f9" : "rgba(255,255,255,0.35)",
+                    color: boardView === opt.value ? "var(--text)" : "rgba(255,255,255,0.35)",
                   }}
                 >
                   {opt.label}
@@ -1318,7 +1348,7 @@ function LoginAnimation({ onDone }) {
   }, [onDone]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#09090e", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif" }}>
       <style>{`
         @keyframes laOverlay { 0%{opacity:0} 8%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
         @keyframes laBrain {
@@ -1624,7 +1654,7 @@ export default function ARRFlow() {
 
   const handleDownload = useCallback(async () => {
     if (!pageRef.current) return;
-    const canvas = await html2canvas(pageRef.current, { backgroundColor: "#09090e", scale: 2, useCORS: true });
+    const canvas = await html2canvas(pageRef.current, { backgroundColor: "var(--bg)", scale: 2, useCORS: true });
     const link = document.createElement("a");
     link.download = `arr-flow-${Date.now()}.png`;
     link.href = canvas.toDataURL("image/png");
@@ -1662,8 +1692,8 @@ export default function ARRFlow() {
   // ─── Auth guards ───────────────────────────────────────────────────────────
   if (authLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#09090e", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif" }}>
-        <div style={{ color: "#334155", fontSize: "13px" }}>Loading…</div>
+      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif" }}>
+        <div style={{ color: "var(--border-strong)", fontSize: "13px" }}>Loading…</div>
       </div>
     );
   }
@@ -1677,15 +1707,15 @@ export default function ARRFlow() {
 
   if (userProfile && !userProfile.active) {
     return (
-      <div style={{ minHeight: "100vh", background: "#09090e", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif", padding: "20px" }}>
-        <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "36px", maxWidth: "380px", textAlign: "center" }}>
-          <div style={{ fontSize: "20px", fontWeight: "600", color: "#f1f5f9", marginBottom: "8px" }}>Account Deactivated</div>
-          <div style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "24px", lineHeight: "1.6" }}>
+      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif", padding: "20px" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid #334155", borderRadius: "12px", padding: "36px", maxWidth: "380px", textAlign: "center" }}>
+          <div style={{ fontSize: "20px", fontWeight: "600", color: "var(--text)", marginBottom: "8px" }}>Account Deactivated</div>
+          <div style={{ color: "var(--text-label)", fontSize: "13px", marginBottom: "24px", lineHeight: "1.6" }}>
             Your access has been revoked. Contact <strong style={{ color: "#a5b4fc" }}>admin@uniqlearn.co</strong> for help.
           </div>
           <button
             onClick={() => signOut(auth)}
-            style={{ padding: "9px 20px", background: "transparent", border: "1px solid #334155", borderRadius: "8px", color: "#94a3b8", fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}
+            style={{ padding: "9px 20px", background: "transparent", border: "1px solid #334155", borderRadius: "8px", color: "var(--text-label)", fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }}
           >
             Sign Out
           </button>
@@ -1695,21 +1725,20 @@ export default function ARRFlow() {
   }
 
   return (
-    <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif", background:"#09090e", height:"100vh", overflow:"hidden", color:"#f0f0f5", display:"flex", flexDirection:"row" }}>
+    <ThemeProvider>
+    <div style={{ fontFamily:"'DM Sans','Helvetica Neue',sans-serif", background:"var(--bg)", height:"100vh", overflow:"hidden", color:"var(--text)", display:"flex", flexDirection:"row" }}>
       {showLoginAnim && <LoginAnimation onDone={() => setShowLoginAnim(false)} />}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing:border-box; margin:0; padding:0; }
-        .tab { padding:6px 16px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; border:1px solid transparent; transition:all 0.15s; background:transparent; color:rgba(255,255,255,0.35); font-family:'DM Sans',sans-serif; }
-        .tab.on { background:rgba(255,255,255,0.09); border-color:rgba(255,255,255,0.12); color:#fff; }
-        .tab:hover:not(.on) { color:rgba(255,255,255,0.6); }
-        input[type=range] { -webkit-appearance:none; width:100%; height:3px; border-radius:4px; background:rgba(255,255,255,0.1); outline:none; }
+        .tab { padding:6px 16px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; border:1px solid transparent; transition:all 0.15s; background:transparent; color:var(--text-muted); font-family:'DM Sans',sans-serif; }
+        .tab.on { background:var(--hover-bg); border-color:var(--border); color:var(--text); }
+        .tab:hover:not(.on) { color:var(--text-label); }
+        input[type=range] { -webkit-appearance:none; width:100%; height:3px; border-radius:4px; background:var(--border-strong); outline:none; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:#6366f1; cursor:pointer; box-shadow:0 0 7px rgba(99,102,241,0.5); }
-        input[type=text], input[type=text]::placeholder { color:rgba(255,255,255,0.3); }
         input[type=text]:focus { border-color:rgba(99,102,241,0.5) !important; }
         @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .fadein { animation:fadeUp 0.22s ease; }
-        ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:4px; }
       `}</style>
 
       {/* Sidebar */}
@@ -1880,5 +1909,6 @@ export default function ARRFlow() {
       </div>
       </div> {/* end scrollable content area */}
     </div>
+    </ThemeProvider>
   );
 }
