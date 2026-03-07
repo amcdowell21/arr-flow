@@ -1053,6 +1053,15 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
     }
   });
 
+  // Ensure all months from Jan of the current year up to (but not including) the current month
+  // are included even if they have no deals, so past months are always visible.
+  const currentYear = now.getFullYear();
+  const currentMonthNum = now.getMonth(); // 0-indexed
+  for (let m = 0; m < currentMonthNum; m++) {
+    const key = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
+    if (!monthGroups[key]) monthGroups[key] = [];
+  }
+
   const sortedMonths = Object.keys(monthGroups).sort();
   const maxAdj = Math.max(
     ...sortedMonths.map(m =>

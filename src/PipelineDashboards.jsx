@@ -127,15 +127,16 @@ function MonthlyForecastChart({ deals }) {
   const now = new Date();
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  // Build list of months: current month + next 11, plus any deal months in range
+  // Build list of months: Jan of current year through 12 months ahead
   const months = useMemo(() => {
     const set = new Set();
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    // From January of this year up to 12 months from now
+    for (let i = 0; i <= now.getMonth() + 12; i++) {
+      const d = new Date(now.getFullYear(), i, 1);
       set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
     }
     deals.forEach(d => { if (d.expectedCloseMonth) set.add(d.expectedCloseMonth); });
-    return Array.from(set).sort().filter(m => m >= thisMonthKey).slice(0, 12);
+    return Array.from(set).sort();
   }, [deals]);
 
   const monthData = useMemo(() => months.map(monthKey => {
@@ -177,7 +178,7 @@ function MonthlyForecastChart({ deals }) {
           Revenue Forecast
         </h3>
         <p style={{ margin: "3px 0 0", fontSize: 11, color: "#64748b" }}>
-          Monthly pipeline · confidence-adjusted · next 12 months · live
+          Monthly pipeline · confidence-adjusted · Jan {now.getFullYear()} onward · live
         </p>
       </div>
 

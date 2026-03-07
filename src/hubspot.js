@@ -162,6 +162,27 @@ export async function fetchDealNotes(token, dealId) {
 }
 
 /**
+ * Return an array of 12 values — closed-won ARR per month for the given year.
+ * Index 0 = January, 11 = December.
+ * @param {Array}  deals  raw deal objects from fetchAllDeals
+ * @param {number} year   defaults to current year
+ */
+export function closedArrByMonth(deals, year = new Date().getFullYear()) {
+  const byMonth = Array(12).fill(0);
+  deals
+    .filter((d) => {
+      if (d.properties?.dealstage !== "closedwon") return false;
+      const dt = d.properties?.closedate;
+      return dt && new Date(dt).getFullYear() === year;
+    })
+    .forEach((d) => {
+      const month = new Date(d.properties.closedate).getMonth();
+      byMonth[month] += parseFloat(d.properties?.amount) || 0;
+    });
+  return byMonth;
+}
+
+/**
  * Sum the `amount` for closed-won deals in the given calendar year.
  * @param {Array}  deals  raw deal objects from fetchAllDeals
  * @param {number} year   defaults to current year
