@@ -215,6 +215,21 @@ function getProductMeta(productId) {
   return PRODUCTS.find(p => p.id === productId) || null;
 }
 
+function fmtTimestamp(ts) {
+  if (!ts) return null;
+  let d;
+  if (typeof ts.toDate === "function") d = ts.toDate();
+  else if (ts.seconds) d = new Date(ts.seconds * 1000);
+  else d = new Date(ts);
+  return isNaN(d) ? null : d;
+}
+
+function fmtCreatedAt(ts) {
+  const d = fmtTimestamp(ts);
+  return d ? d.toLocaleDateString("en-US", { month: "short", year: "numeric" }) : null;
+}
+
+
 // ─── DealRow ──────────────────────────────────────────────────────────────────
 function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
   const [editing, setEditing] = useState(false);
@@ -465,6 +480,15 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
                   style={{ ...inp }}
                 />
               </div>
+              <div>
+                <label style={{ fontSize: 11, color: "#a78bfa", display: "block", marginBottom: 3 }}>Demo Date</label>
+                <input
+                  type="date"
+                  value={local.demoDate || ""}
+                  onChange={e => setLocal(p => ({ ...p, demoDate: e.target.value }))}
+                  style={{ ...inp }}
+                />
+              </div>
             </div>
 
             {/* Notes */}
@@ -599,6 +623,16 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
         {local.contactName && (
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{local.contactName}</div>
         )}
+        <div style={{ display: "flex", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
+          {deal.createdAt && (
+            <span style={{ fontSize: 10, color: "#64748b" }}>Added {fmtCreatedAt(deal.createdAt)}</span>
+          )}
+          {local.demoDate && (
+            <span style={{ fontSize: 10, color: "#a78bfa" }}>
+              Demo {new Date(local.demoDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </span>
+          )}
+        </div>
       </td>
       <td style={{ ...cell, textAlign: "right", color: local.closedWon ? "#4ade80" : "var(--text-body)" }}>{formatCurrency(local.value)}</td>
       <td style={{ ...cell, textAlign: "center" }}>
@@ -745,7 +779,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
     bucket: "active", expectedCloseMonth: MONTH_OPTIONS[2]?.value || "",
     useAlgoConfidence: false, manualConfidence: 30,
     meetingBooked: false, touchCount: 0,
-    lastActivityDate: "", notes: "",
+    lastActivityDate: "", demoDate: "", notes: "",
   });
 
   function handleSelectHsDeal(d) {
@@ -997,6 +1031,16 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
               style={{ transform: "scale(1.3)", cursor: "pointer", display: "block" }}
             />
           </div>
+        </div>
+
+        {/* Demo Date */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ ...lbl, color: "#a78bfa" }}>Demo Date</label>
+          <input
+            type="date" style={{ ...inp, maxWidth: 200 }}
+            value={form.demoDate || ""}
+            onChange={e => setForm(p => ({ ...p, demoDate: e.target.value }))}
+          />
         </div>
 
         {/* Notes */}
