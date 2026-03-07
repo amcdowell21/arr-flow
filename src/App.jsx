@@ -1069,7 +1069,7 @@ function HubSpotPage({ hs }) {
   const { deals, pipelines, syncing, error, lastSync, closedArr, demoStageId, demoHistory } = hs;
   const [activePipelineId, setActivePipelineId] = useState(null);
   const [expandedStageId, setExpandedStageId] = useState(null);
-  const [boardView, setBoardView] = useState(false);
+  const [boardView, setBoardView] = useState(true);
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [hoveredDemoMonth, setHoveredDemoMonth] = useState(null);
 
@@ -1118,7 +1118,7 @@ function HubSpotPage({ hs }) {
           {/* List / Board toggle */}
           {deals.length > 0 && (
             <div style={{ display:"flex", background:"var(--input-bg)", border:"1px solid var(--border)", borderRadius:8, padding:2, gap:2 }}>
-              {[{ label:"List", value:false }, { label:"Board", value:true }].map(opt => (
+              {[{ label:"Board", value:true }, { label:"List", value:false }].map(opt => (
                 <button
                   key={opt.label}
                   onClick={() => setBoardView(opt.value)}
