@@ -3,10 +3,10 @@ import html2canvas from "html2canvas";
 import { db, auth } from "./firebase";
 import {
   collection, addDoc, onSnapshot, deleteDoc, doc, serverTimestamp, query, orderBy,
-  getDoc, setDoc,
+  getDoc, setDoc, where, getDocs, updateDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { fetchAllDeals, fetchPipelines, closedArrForYear, updateDealStage } from "./hubspot";
+import { fetchAllDeals, fetchPipelines, closedArrForYear, updateDealStage, fetchDealContacts, fetchDealNotes } from "./hubspot";
 import PipelinePage from "./PipelinePage";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
@@ -648,7 +648,186 @@ function HomePage({ onNavigate }) {
 }
 
 // ─── Kanban Board ─────────────────────────────────────────────────────────────
-function KanbanBoard({ deals, pipeline, onUpdateDealStage }) {
+// ─── Deal Detail Modal ────────────────────────────────────────────────────────
+function DealDetailModal({ deal, pipelines, token, onClose }) {
+  const [contacts, setContacts] = useState([]);
+  const [notes, setNotes]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (!deal?.id || !token) { setLoading(false); return; }
+    setLoading(true);
+    setContacts([]);
+    setNotes([]);
+    Promise.all([
+      fetchDealContacts(token, deal.id).catch(() => []),
+      fetchDealNotes(token, deal.id).catch(() => []),
+    ]).then(([c, n]) => {
+      setContacts(c);
+      setNotes(n);
+      setLoading(false);
+    });
+  }, [deal?.id, token]);
+
+  if (!deal) return null;
+  const p = deal.properties || {};
+
+  const pipeline = pipelines.find(pl => pl.id === p.pipeline);
+  const stage    = pipeline?.stages?.find(s => s.id === p.dealstage);
+  const prob     = stage?.metadata?.probability != null ? parseFloat(stage.metadata.probability) : null;
+  const isWon    = prob === 1.0 || p.dealstage === "closedwon";
+  const isLost   = prob === 0.0 || p.dealstage === "closedlost";
+  const amount   = parseFloat(p.amount) || 0;
+
+  function fmtDate(d) {
+    if (!d) return null;
+    return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  function fmtDateTime(d) {
+    if (!d) return null;
+    return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  const rows = [
+    { label: "Pipeline",        value: pipeline?.label },
+    { label: "Stage",           value: stage?.label },
+    { label: "Win Probability", value: prob != null ? `${Math.round(prob * 100)}%` : null },
+    { label: "Deal Type",       value: p.dealtype },
+    { label: "Close Date",      value: fmtDate(p.closedate) },
+    { label: "Created",         value: fmtDate(p.createdate) },
+    { label: "Last Modified",   value: fmtDate(p.hs_lastmodifieddate) },
+    { label: "Owner ID",        value: p.hubspot_owner_id },
+    { label: "Description",     value: p.description, full: true },
+  ].filter(r => r.value);
+
+  const dotColor = isWon ? "#34d399" : isLost ? "#f87171" : "#818cf8";
+  const amtColor = isWon ? "#6ee7b7" : "#a5f3fc";
+
+  return (
+    <div
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background:"#1a2235", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, width:580, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto", display:"flex", flexDirection:"column" }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ padding:"22px 24px 18px", borderBottom:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"flex-start", gap:14 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:17, fontWeight:700, color:"#f1f5f9", lineHeight:1.3, marginBottom:6 }}>
+              {p.dealname || "Untitled Deal"}
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ width:6, height:6, borderRadius:2, background:dotColor, flexShrink:0 }} />
+              <span style={{ fontSize:11, color:"rgba(255,255,255,0.4)", fontFamily:"'DM Mono',monospace" }}>
+                {stage?.label ?? p.dealstage ?? "—"}
+                {pipeline && <span style={{ color:"rgba(255,255,255,0.2)" }}> · {pipeline.label}</span>}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"rgba(255,255,255,0.45)", cursor:"pointer", fontSize:16, lineHeight:1, padding:"6px 10px", flexShrink:0 }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Amount hero */}
+        {amount > 0 && (
+          <div style={{ margin:"18px 24px 0", background: isWon ? "rgba(52,211,153,0.07)" : "rgba(165,243,252,0.06)", border:`1px solid ${isWon ? "rgba(52,211,153,0.2)" : "rgba(165,243,252,0.14)"}`, borderRadius:10, padding:"14px 18px" }}>
+            <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Contract Value</div>
+            <div style={{ fontSize:26, fontWeight:700, color:amtColor, fontFamily:"'DM Mono',monospace", letterSpacing:"-0.5px" }}>
+              {formatCurrency(amount)}
+            </div>
+          </div>
+        )}
+
+        {/* Property grid */}
+        <div style={{ padding:"18px 24px 6px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px 20px" }}>
+          {rows.map(r => (
+            <div key={r.label} style={r.full ? { gridColumn:"1 / -1" } : {}}>
+              <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>
+                {r.label}
+              </div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.72)", lineHeight:1.55, wordBreak:"break-word" }}>
+                {r.value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Contacts section */}
+        <div style={{ margin:"20px 24px 0", borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:16 }}>
+          <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+            Contacts {!loading && contacts.length > 0 && `(${contacts.length})`}
+          </div>
+          {loading ? (
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>Loading…</div>
+          ) : contacts.length === 0 ? (
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>No contacts associated</div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {contacts.map(c => {
+                const cp = c.properties || {};
+                const name = [cp.firstname, cp.lastname].filter(Boolean).join(" ") || "Unknown";
+                return (
+                  <div key={c.id} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:8, padding:"10px 13px", display:"flex", flexDirection:"column", gap:3 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,0.8)" }}>{name}</div>
+                    {cp.jobtitle && <div style={{ fontSize:11, color:"rgba(255,255,255,0.38)" }}>{cp.jobtitle}</div>}
+                    <div style={{ display:"flex", gap:14, flexWrap:"wrap", marginTop:2 }}>
+                      {cp.email && <a href={`mailto:${cp.email}`} style={{ fontSize:11, color:"#818cf8", textDecoration:"none", fontFamily:"'DM Mono',monospace" }}>{cp.email}</a>}
+                      {cp.phone && <span style={{ fontSize:11, color:"rgba(255,255,255,0.4)", fontFamily:"'DM Mono',monospace" }}>{cp.phone}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Notes section */}
+        <div style={{ margin:"20px 24px 0", borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:16 }}>
+          <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+            Notes {!loading && notes.length > 0 && `(${notes.length})`}
+          </div>
+          {loading ? (
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>Loading…</div>
+          ) : notes.length === 0 ? (
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>No notes found</div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {notes.map(n => {
+                const np = n.properties || {};
+                const body = np.hs_note_body?.replace(/<[^>]*>/g, "") || "";
+                return (
+                  <div key={n.id} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:8, padding:"10px 13px" }}>
+                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", marginBottom:6 }}>
+                      {fmtDateTime(np.hs_timestamp)}
+                    </div>
+                    <div style={{ fontSize:12, color:"rgba(255,255,255,0.65)", lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>
+                      {body || <span style={{ color:"rgba(255,255,255,0.18)" }}>(empty note)</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:"14px 24px 20px", borderTop:"1px solid rgba(255,255,255,0.05)", marginTop:16 }}>
+          <div style={{ fontSize:10, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>
+            HubSpot Deal ID: {deal.id}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
   const [collapsed, setCollapsed] = useState(new Set());
@@ -815,13 +994,16 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage }) {
                     draggable
                     onDragStart={(e) => handleDragStart(e, deal.id)}
                     onDragEnd={handleDragEnd}
+                    onClick={() => onSelectDeal(deal)}
                     style={{
                       background: isDragging ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.045)",
                       border: `1px solid ${isDragging ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.08)"}`,
                       borderRadius: 8, padding: "9px 11px",
-                      cursor: "grab", opacity: isDragging ? 0.5 : 1,
-                      transition: "opacity 0.1s, border 0.1s",
+                      cursor: "pointer", opacity: isDragging ? 0.5 : 1,
+                      transition: "opacity 0.1s, border 0.1s, background 0.1s",
                     }}
+                    onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.075)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isDragging ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.045)"; }}
                   >
                     <div style={{ fontSize:12, color:"rgba(255,255,255,0.78)", lineHeight:1.35, marginBottom: (amount > 0 || closeDate) ? 5 : 0 }}>
                       {deal.properties?.dealname || "Untitled deal"}
@@ -858,6 +1040,7 @@ function HubSpotPage({ hs }) {
   const [activePipelineId, setActivePipelineId] = useState(null);
   const [expandedStageId, setExpandedStageId] = useState(null);
   const [boardView, setBoardView] = useState(false);
+  const [selectedDeal, setSelectedDeal] = useState(null);
 
   useEffect(() => {
     if (pipelines.length > 0 && !activePipelineId) {
@@ -1017,6 +1200,7 @@ function HubSpotPage({ hs }) {
               deals={deals}
               pipeline={pipeline}
               onUpdateDealStage={hs.onUpdateDealStage}
+              onSelectDeal={setSelectedDeal}
             />
           )}
 
@@ -1070,20 +1254,27 @@ function HubSpotPage({ hs }) {
 
                     {/* Expanded deals */}
                     {isExpanded && stageDeals.map(deal => (
-                      <div key={deal.id} style={{
-                        display:"grid", gridTemplateColumns:"1fr 70px 130px 28px",
-                        padding:"8px 16px 8px 42px",
-                        borderBottom:"1px solid rgba(255,255,255,0.025)",
-                        background:"rgba(255,255,255,0.012)",
-                      }}>
-                        <span style={{ fontSize:11, color:"rgba(255,255,255,0.48)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      <div
+                        key={deal.id}
+                        onClick={() => setSelectedDeal(deal)}
+                        style={{
+                          display:"grid", gridTemplateColumns:"1fr 70px 130px 28px",
+                          padding:"8px 16px 8px 42px",
+                          borderBottom:"1px solid rgba(255,255,255,0.025)",
+                          background:"rgba(255,255,255,0.012)",
+                          cursor:"pointer", transition:"background 0.12s",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.035)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.012)"; }}
+                      >
+                        <span style={{ fontSize:11, color:"rgba(255,255,255,0.6)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                           {deal.properties?.dealname || "Untitled deal"}
                         </span>
                         <span />
                         <span style={{ fontSize:11, color:"rgba(255,255,255,0.38)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
                           {parseFloat(deal.properties?.amount) > 0 ? formatCurrency(parseFloat(deal.properties.amount)) : "—"}
                         </span>
-                        <span />
+                        <span style={{ textAlign:"right", fontSize:9, color:"rgba(255,255,255,0.18)" }}>›</span>
                       </div>
                     ))}
                   </div>
@@ -1105,6 +1296,15 @@ function HubSpotPage({ hs }) {
         <div style={{ textAlign:"center", padding:"80px 0", color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", fontSize:12, lineHeight:2 }}>
           Add your HubSpot token in the sidebar to get started.
         </div>
+      )}
+
+      {selectedDeal && (
+        <DealDetailModal
+          deal={selectedDeal}
+          pipelines={pipelines}
+          token={hs.token}
+          onClose={() => setSelectedDeal(null)}
+        />
       )}
     </div>
   );
@@ -1372,12 +1572,34 @@ export default function ARRFlow() {
     }
   }, [hsToken]);
 
+  const handleHsDealClosed = useCallback((hubspotId) => {
+    setHsDeals(prev => prev.map(d =>
+      d.id === hubspotId ? { ...d, properties: { ...d.properties, dealstage: "closedwon" } } : d
+    ));
+  }, []);
+
   const handleUpdateDealStage = useCallback(async (dealId, stageId) => {
     setHsDeals(prev => prev.map(d =>
       d.id === dealId ? { ...d, properties: { ...d.properties, dealstage: stageId } } : d
     ));
     try {
       await updateDealStage(hsToken.trim(), dealId, stageId);
+      // Sync stage changes to Pipeline Tracker regardless of which page is mounted
+      if (stageId === "closedwon" || stageId === "closedlost") {
+        const snap = await getDocs(
+          query(collection(db, "pipelineDeals"), where("hubspotId", "==", dealId))
+        );
+        snap.forEach(docSnap => {
+          if (stageId === "closedwon" && !docSnap.data().closedWon) {
+            updateDoc(doc(db, "pipelineDeals", docSnap.id), {
+              closedWon: true,
+              updatedAt: serverTimestamp(),
+            });
+          } else if (stageId === "closedlost") {
+            deleteDoc(doc(db, "pipelineDeals", docSnap.id));
+          }
+        });
+      }
     } catch (e) {
       setHsError(`Failed to update deal: ${e.message}`);
       // Re-sync to restore real state
@@ -1514,7 +1736,7 @@ export default function ARRFlow() {
       {view === "hubspot" && <HubSpotPage hs={hs} />}
 
       {/* Pipeline page */}
-      {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} />}
+      {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} hsToken={hsToken} onHsDealClosed={handleHsDealClosed} />}
 
       {/* Admin panel (admin only) */}
       {view === "admin" && isAdmin && <AdminPanel currentUser={currentUser} onNavigate={setView} />}

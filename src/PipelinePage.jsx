@@ -6,6 +6,8 @@ import {
   collection, addDoc, onSnapshot, deleteDoc, doc,
   serverTimestamp, query, orderBy, updateDoc,
 } from "firebase/firestore";
+import PipelineDashboards from "./PipelineDashboards";
+import { fetchDealContacts, fetchDealNotes, updateDealStage } from "./hubspot";
 
 // ─── CSV seed data ────────────────────────────────────────────────────────────
 const CSV_SEED_DATA = [
@@ -214,11 +216,27 @@ function getProductMeta(productId) {
 }
 
 // ─── DealRow ──────────────────────────────────────────────────────────────────
-function DealRow({ deal, onUpdate, onDelete, events = [] }) {
+function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(deal);
+  const [hsContacts, setHsContacts] = useState([]);
+  const [hsNotes,    setHsNotes]    = useState([]);
+  const [hsLoading,  setHsLoading]  = useState(false);
 
   useEffect(() => { setLocal(deal); }, [deal]);
+
+  useEffect(() => {
+    if (!editing || !deal.hubspotId || !token) return;
+    setHsLoading(true);
+    Promise.all([
+      fetchDealContacts(token, deal.hubspotId).catch(() => []),
+      fetchDealNotes(token, deal.hubspotId).catch(() => []),
+    ]).then(([c, n]) => {
+      setHsContacts(c);
+      setHsNotes(n);
+      setHsLoading(false);
+    });
+  }, [editing, deal.hubspotId, token]);
 
   const effective = getEffectiveConfidence(local);
   const adjustedValue = (local.value || 0) * (effective / 100);
@@ -459,6 +477,68 @@ function DealRow({ deal, onUpdate, onDelete, events = [] }) {
                 style={{ ...inp, width: "100%", resize: "vertical" }}
               />
             </div>
+
+            {/* HubSpot contacts + notes (only for HS-linked deals) */}
+            {deal.hubspotId && (
+              <div style={{ borderTop: "1px solid #334155", paddingTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Contacts */}
+                <div>
+                  <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    HubSpot Contacts {!hsLoading && hsContacts.length > 0 && `(${hsContacts.length})`}
+                  </div>
+                  {hsLoading ? (
+                    <div style={{ fontSize: 11, color: "#475569" }}>Loading…</div>
+                  ) : hsContacts.length === 0 ? (
+                    <div style={{ fontSize: 11, color: "#475569" }}>No contacts associated</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {hsContacts.map(c => {
+                        const cp = c.properties || {};
+                        const name = [cp.firstname, cp.lastname].filter(Boolean).join(" ") || "Unknown";
+                        return (
+                          <div key={c.id} style={{ background: "#0f172a", border: "1px solid #1e3a5f", borderRadius: 6, padding: "8px 11px" }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{name}</div>
+                            {cp.jobtitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>{cp.jobtitle}</div>}
+                            <div style={{ display: "flex", gap: 12, marginTop: 3, flexWrap: "wrap" }}>
+                              {cp.email && <a href={`mailto:${cp.email}`} style={{ fontSize: 11, color: "#818cf8", textDecoration: "none" }}>{cp.email}</a>}
+                              {cp.phone && <span style={{ fontSize: 11, color: "#64748b" }}>{cp.phone}</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    HubSpot Notes {!hsLoading && hsNotes.length > 0 && `(${hsNotes.length})`}
+                  </div>
+                  {hsLoading ? (
+                    <div style={{ fontSize: 11, color: "#475569" }}>Loading…</div>
+                  ) : hsNotes.length === 0 ? (
+                    <div style={{ fontSize: 11, color: "#475569" }}>No notes found</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {hsNotes.map(n => {
+                        const np = n.properties || {};
+                        const body = np.hs_note_body?.replace(/<[^>]*>/g, "") || "";
+                        const ts = np.hs_timestamp ? new Date(np.hs_timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+                        return (
+                          <div key={n.id} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, padding: "8px 11px" }}>
+                            {ts && <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{ts}</div>}
+                            <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {body || <span style={{ color: "#334155" }}>(empty)</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div style={{ display: "flex", gap: 8 }}>
@@ -955,7 +1035,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
 }
 
 // ─── MonthByMonthDeals ────────────────────────────────────────────────────────
-function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [] }) {
+function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
   const [collapsed, setCollapsed] = useState({});
 
   const now = new Date();
@@ -1051,7 +1131,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [] }) {
               </thead>
               <tbody>
                 {sectionDeals.map(deal => (
-                  <DealRow key={deal.id} deal={deal} onUpdate={onUpdate} onDelete={onDelete} events={events} />
+                  <DealRow key={deal.id} deal={deal} onUpdate={onUpdate} onDelete={onDelete} events={events} token={token} />
                 ))}
               </tbody>
               <tfoot>
@@ -1305,7 +1385,7 @@ function OutboundActuals({ actuals, onAdd, onDelete }) {
 }
 
 // ─── Main Pipeline Page ───────────────────────────────────────────────────────
-export default function PipelinePage({ hsDeals, hsPipelines }) {
+export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealClosed }) {
   const [deals,        setDeals]        = useState([]);
   const [events,       setEvents]       = useState([]);
   const [actuals,      setActuals]      = useState([]);
@@ -1315,6 +1395,7 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
   const [importing,    setImporting]    = useState(false);
   const [searchQuery,  setSearchQuery]  = useState("");
   const [productFilter, setProductFilter] = useState("all");
+  const [activeTab,    setActiveTab]    = useState("dashboards");
 
   // Firestore listeners
   useEffect(() => {
@@ -1341,6 +1422,23 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
     return unsub;
   }, []);
 
+  // ── HubSpot → Pipeline Tracker sync ──
+  // When hsDeals updates (Refresh or Kanban drag), auto-close matching Firestore deals
+  useEffect(() => {
+    if (!hsDeals?.length || !deals.length) return;
+    const closedHsIds = new Set(
+      hsDeals.filter(d => d.properties?.dealstage === "closedwon").map(d => d.id)
+    );
+    for (const deal of deals) {
+      if (deal.hubspotId && closedHsIds.has(deal.hubspotId) && !deal.closedWon) {
+        updateDoc(doc(db, "pipelineDeals", deal.id), {
+          closedWon: true,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
+  }, [hsDeals]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Deal CRUD ──
   async function addDeal(form) {
     const { source, hubspotId, ...rest } = form;
@@ -1358,9 +1456,16 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
 
   async function updateDeal(id, data) {
     const { id: _id, ...rest } = data;
+    const prevDeal = deals.find(d => d.id === id);
+
+    // Pipeline Tracker → HubSpot: push close when closedWon is newly checked
+    if (rest.closedWon && !prevDeal?.closedWon && rest.hubspotId && hsToken) {
+      updateDealStage(hsToken, rest.hubspotId, "closedwon")
+        .then(() => onHsDealClosed?.(rest.hubspotId))
+        .catch(e => console.error("HubSpot close sync failed:", e));
+    }
 
     // Sync event dealsWon / dealValue based on closedWon state changes
-    const prevDeal = deals.find(d => d.id === id);
     const prevEventId = prevDeal?.funnelType === "event" && prevDeal?.closedWon ? prevDeal.funnelEventId : null;
     const newEventId  = rest.funnelType === "event" && rest.closedWon ? rest.funnelEventId : null;
 
@@ -1593,61 +1698,95 @@ export default function PipelinePage({ hsDeals, hsPipelines }) {
         ))}
       </div>
 
-      {/* Search + product filters */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 360 }}>
-          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#475569", fontSize: 14, pointerEvents: "none" }}>🔍</span>
-          <input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search deals by name…"
-            style={{
-              width: "100%", boxSizing: "border-box",
-              paddingLeft: 32, paddingRight: searchQuery ? 28 : 10,
-              paddingTop: 7, paddingBottom: 7,
-              background: "#1e293b", border: "1px solid #334155",
-              borderRadius: 7, color: "#e2e8f0", fontSize: 13,
-            }}
-          />
-          {searchQuery && (
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid #334155", paddingBottom: 0 }}>
+        {[
+          { id: "dashboards", label: "Dashboards" },
+          { id: "deals",      label: "Pipeline Deals" },
+          { id: "activity",   label: "Events & Outbound" },
+        ].map(tab => {
+          const active = activeTab === tab.id;
+          return (
             <button
-              onClick={() => setSearchQuery("")}
-              style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}
-            >×</button>
-          )}
-        </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {PRODUCT_FILTERS.map(f => {
-            const active = productFilter === f.id;
-            return (
-              <button
-                key={f.id}
-                onClick={() => setProductFilter(f.id)}
-                style={{
-                  padding: "5px 13px", fontSize: 12, borderRadius: 6, cursor: "pointer", fontWeight: active ? 600 : 400,
-                  border: active ? `1px solid ${f.color || "#6366f1"}` : "1px solid #334155",
-                  background: active ? (f.color ? f.color + "22" : "rgba(99,102,241,0.15)") : "#1e293b",
-                  color: active ? (f.color || "#a5b4fc") : "#94a3b8",
-                }}
-              >{f.label}</button>
-            );
-          })}
-        </div>
-        {(searchQuery || productFilter !== "all") && (
-          <span style={{ fontSize: 12, color: "#475569" }}>
-            {filteredDeals.length} of {deals.length} deals
-          </span>
-        )}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: "8px 18px", fontSize: 13, cursor: "pointer",
+                background: "none", border: "none", borderBottom: active ? "2px solid #6366f1" : "2px solid transparent",
+                color: active ? "#a5b4fc" : "#64748b", fontWeight: active ? 600 : 400,
+                marginBottom: -1, transition: "color 0.15s",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Month-by-month deal view */}
-      <MonthByMonthDeals deals={filteredDeals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} />
+      {/* Dashboards tab */}
+      {activeTab === "dashboards" && (
+        <PipelineDashboards deals={deals} />
+      )}
 
-      {/* Event tracking */}
-      <EventsSection events={events} onAdd={addEvent} onDelete={deleteEvent} />
+      {/* Deals tab */}
+      {activeTab === "deals" && (
+        <>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+            <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 360 }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#475569", fontSize: 14, pointerEvents: "none" }}>🔍</span>
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search deals by name…"
+                style={{
+                  width: "100%", boxSizing: "border-box",
+                  paddingLeft: 32, paddingRight: searchQuery ? 28 : 10,
+                  paddingTop: 7, paddingBottom: 7,
+                  background: "#1e293b", border: "1px solid #334155",
+                  borderRadius: 7, color: "#e2e8f0", fontSize: 13,
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0 }}
+                >×</button>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {PRODUCT_FILTERS.map(f => {
+                const active = productFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setProductFilter(f.id)}
+                    style={{
+                      padding: "5px 13px", fontSize: 12, borderRadius: 6, cursor: "pointer", fontWeight: active ? 600 : 400,
+                      border: active ? `1px solid ${f.color || "#6366f1"}` : "1px solid #334155",
+                      background: active ? (f.color ? f.color + "22" : "rgba(99,102,241,0.15)") : "#1e293b",
+                      color: active ? (f.color || "#a5b4fc") : "#94a3b8",
+                    }}
+                  >{f.label}</button>
+                );
+              })}
+            </div>
+            {(searchQuery || productFilter !== "all") && (
+              <span style={{ fontSize: 12, color: "#475569" }}>
+                {filteredDeals.length} of {deals.length} deals
+              </span>
+            )}
+          </div>
+          <MonthByMonthDeals deals={filteredDeals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} token={hsToken} />
+        </>
+      )}
 
-      {/* Outbound actuals */}
-      <OutboundActuals actuals={actuals} onAdd={addActual} onDelete={deleteActual} />
+      {/* Activity tab */}
+      {activeTab === "activity" && (
+        <>
+          <EventsSection events={events} onAdd={addEvent} onDelete={deleteEvent} />
+          <OutboundActuals actuals={actuals} onAdd={addActual} onDelete={deleteActual} />
+        </>
+      )}
 
       {/* Add to pipeline modal */}
       {showAddDeal && (
