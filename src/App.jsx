@@ -129,14 +129,14 @@ function Slider({ config, value, onChange }) {
   return (
     <div style={{ marginBottom:12 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
-        <label style={{ fontSize:11, color:"rgba(255,255,255,0.38)", fontFamily:"'DM Mono',monospace" }}>{config.label}</label>
-        <span style={{ fontSize:12, color:"#fff", fontWeight:600, fontFamily:"'DM Mono',monospace" }}>
+        <label style={{ fontSize:11, color:"var(--text-label)", fontFamily:"'DM Mono',monospace" }}>{config.label}</label>
+        <span style={{ fontSize:12, color:"var(--text)", fontWeight:600, fontFamily:"'DM Mono',monospace" }}>
           {config.isCurrency ? formatCurrency(value) : `${value}${config.suffix}`}
         </span>
       </div>
       <input type="range" min={config.min} max={config.max} step={config.step} value={value}
         onChange={e=>onChange(config.key, Number(e.target.value))} style={{ width:"100%", cursor:"pointer" }} />
-      <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"rgba(255,255,255,0.15)", fontFamily:"'DM Mono',monospace", marginTop:1 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", marginTop:1 }}>
         <span>{config.isCurrency ? formatCurrency(config.min) : `${config.min}${config.suffix}`}</span>
         <span>{config.isCurrency ? formatCurrency(config.max) : `${config.max}${config.suffix}`}</span>
       </div>
@@ -174,17 +174,17 @@ function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputV
           {i > 0 && (
             <div style={{ height:20, display:"flex", alignItems:"center", justifyContent:"center" }}>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
-                <div style={{ width:2, height:11, background:"rgba(255,255,255,0.1)" }} />
-                <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0L4 5L8 0" fill="rgba(255,255,255,0.12)"/></svg>
+                <div style={{ width:2, height:11, background:"var(--border)" }} />
+                <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0L4 5L8 0" fill="var(--border)"/></svg>
               </div>
             </div>
           )}
-          <div style={{ border:`1px solid ${badge ? badge.border : "rgba(255,255,255,0.08)"}`, borderRadius:9, padding:"11px 13px", background: badge ? badge.bg : "rgba(255,255,255,0.025)", position:"relative", overflow:"hidden", transition:"border-color 0.2s, background 0.2s" }}>
+          <div style={{ border:`1px solid ${badge ? badge.border : "var(--border)"}`, borderRadius:9, padding:"11px 13px", background: badge ? badge.bg : "var(--surface)", position:"relative", overflow:"hidden", transition:"border-color 0.2s, background 0.2s" }}>
             <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, borderRadius:"3px 0 0 3px", background:m.color, opacity:0.65 }} />
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:600, color:"#fff", marginBottom:2, lineHeight:1.3 }}>{m.label}</div>
-                <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", lineHeight:1.4 }}>{m.sublabel}</div>
+                <div style={{ fontSize:12, fontWeight:600, color:"var(--text)", marginBottom:2, lineHeight:1.3 }}>{m.label}</div>
+                <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", lineHeight:1.4 }}>{m.sublabel}</div>
               </div>
               {mode === "calculator" ? (
                 <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, fontWeight:700, color:m.color, textAlign:"right", flexShrink:0, marginLeft:6 }}>
@@ -201,9 +201,9 @@ function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputV
                 style={{
                   display:"inline-flex", alignItems:"center", gap:4,
                   background: badge ? badge.bg : "transparent",
-                  border: `1px ${badge ? "solid" : "dashed"} ${badge ? badge.border : "rgba(255,255,255,0.15)"}`,
+                  border: `1px ${badge ? "solid" : "dashed"} ${badge ? badge.border : "var(--text-faint)"}`,
                   borderRadius:20, padding:"2px 8px", cursor:"pointer",
-                  color: badge ? badge.color : "rgba(255,255,255,0.22)",
+                  color: badge ? badge.color : "var(--text-faint)",
                   fontSize:9, fontWeight:600, fontFamily:"'DM Mono',monospace",
                   letterSpacing:"0.06em", transition:"all 0.15s",
                 }}
@@ -219,8 +219,8 @@ function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputV
       {/* Output node */}
       <div style={{ height:20, display:"flex", alignItems:"center", justifyContent:"center" }}>
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
-          <div style={{ width:2, height:11, background:"rgba(255,255,255,0.1)" }} />
-          <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0L4 5L8 0" fill="rgba(255,255,255,0.12)"/></svg>
+          <div style={{ width:2, height:11, background:"var(--border)" }} />
+          <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0L4 5L8 0" fill="var(--border)"/></svg>
         </div>
       </div>
       <div style={{ border:`1px solid ${outputColor}35`, borderRadius:9, padding:"12px 13px", background:`${outputColor}0c`, position:"relative", overflow:"hidden" }}>
@@ -228,7 +228,7 @@ function FunnelColumn({ nodes, computed, mode, outputColor, outputLabel, outputV
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <div style={{ fontSize:12, fontWeight:600, color:outputColor, marginBottom:2 }}>{outputLabel}</div>
-            <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace" }}>Annual · 52 weeks</div>
+            <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>Annual · 52 weeks</div>
           </div>
           {mode === "calculator" && (
             <div style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:700, color:outputColor }}>
@@ -252,12 +252,12 @@ function SlidersPanel({ title, color, sections, values, onChange }) {
         <div style={{ width:6, height:6, borderRadius:"50%", background:color, boxShadow:`0 0 6px ${color}90` }} />
         <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:`${color}cc` }}>{title}</span>
       </div>
-      <div style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:13, padding:18 }}>
+      <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:13, padding:18 }}>
         {sections.map(s => (
           <div key={s.section} style={{ marginBottom:18 }}>
             <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:9 }}>
               <div style={{ width:5, height:5, borderRadius:"50%", background:s.color }} />
-              <span style={{ fontSize:10, fontWeight:600, color:"rgba(255,255,255,0.4)" }}>{s.section}</span>
+              <span style={{ fontSize:10, fontWeight:600, color:"var(--text-label)" }}>{s.section}</span>
             </div>
             {s.inputs.map(inp => <Slider key={inp.key} config={inp} value={values[inp.key]} onChange={onChange} />)}
           </div>
@@ -297,9 +297,9 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
       color: "#6366f1",
       icon: (active) => (
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="1" y="8" width="3" height="5" rx="0.6" fill={active ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
-          <rect x="5.5" y="5" width="3" height="8" rx="0.6" fill={active ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
-          <rect x="10" y="1" width="3" height="12" rx="0.6" fill={active ? "#a5b4fc" : "rgba(255,255,255,0.3)"}/>
+          <rect x="1" y="8" width="3" height="5" rx="0.6" fill={active ? "#a5b4fc" : "var(--text-muted)"}/>
+          <rect x="5.5" y="5" width="3" height="8" rx="0.6" fill={active ? "#a5b4fc" : "var(--text-muted)"}/>
+          <rect x="10" y="1" width="3" height="12" rx="0.6" fill={active ? "#a5b4fc" : "var(--text-muted)"}/>
         </svg>
       ),
     },
@@ -310,7 +310,7 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
       hasDropdown: true,
       icon: (active) => (
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M2 4h10M2 7h7M2 10h4" stroke={active ? "#c4b5fd" : "rgba(255,255,255,0.3)"} strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M2 4h10M2 7h7M2 10h4" stroke={active ? "#c4b5fd" : "var(--text-muted)"} strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
       ),
     },
@@ -320,8 +320,8 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
       color: "#10b981",
       icon: (active) => (
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <circle cx="7" cy="7" r="5.5" stroke={active ? "#6ee7b7" : "rgba(255,255,255,0.3)"} strokeWidth="1.4"/>
-          <circle cx="7" cy="7" r="2" fill={active ? "#6ee7b7" : "rgba(255,255,255,0.3)"}/>
+          <circle cx="7" cy="7" r="5.5" stroke={active ? "#6ee7b7" : "var(--text-muted)"} strokeWidth="1.4"/>
+          <circle cx="7" cy="7" r="2" fill={active ? "#6ee7b7" : "var(--text-muted)"}/>
         </svg>
       ),
     },
@@ -333,8 +333,8 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
     color: "#f59e0b",
     icon: (active) => (
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <circle cx="7" cy="5" r="2.3" stroke={active ? "#fcd34d" : "rgba(255,255,255,0.3)"} strokeWidth="1.4"/>
-        <path d="M2.5 12c0-2.49 2.01-4.5 4.5-4.5s4.5 2.01 4.5 4.5" stroke={active ? "#fcd34d" : "rgba(255,255,255,0.3)"} strokeWidth="1.4" strokeLinecap="round"/>
+        <circle cx="7" cy="5" r="2.3" stroke={active ? "#fcd34d" : "var(--text-muted)"} strokeWidth="1.4"/>
+        <path d="M2.5 12c0-2.49 2.01-4.5 4.5-4.5s4.5 2.01 4.5 4.5" stroke={active ? "#fcd34d" : "var(--text-muted)"} strokeWidth="1.4" strokeLinecap="round"/>
       </svg>
     ),
   }] : navItems;
@@ -629,11 +629,11 @@ function HomePage({ onNavigate }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 32px", minWidth: 0 }}>
       <div style={{ textAlign: "center", marginBottom: 52 }}>
-        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: "0.15em", color: "rgba(255,255,255,0.18)", textTransform: "uppercase", marginBottom: 12 }}>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: "0.15em", color: "var(--text-faint)", textTransform: "uppercase", marginBottom: 12 }}>
           Working Backwards · New Logo ARR
         </div>
-        <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.5px", color: "#fff", marginBottom: 10 }}>Revenue Intelligence</h1>
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.28)", maxWidth: 380, lineHeight: 1.65, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.5px", color: "var(--text)", marginBottom: 10 }}>Revenue Intelligence</h1>
+        <p style={{ fontSize: 13, color: "var(--text-faint)", maxWidth: 380, lineHeight: 1.65, margin: "0 auto" }}>
           Choose a workspace to get started.
         </p>
       </div>
@@ -644,8 +644,8 @@ function HomePage({ onNavigate }) {
             key={tile.id}
             onClick={() => onNavigate(tile.id)}
             style={{
-              width: 250, textAlign: "left", background: "rgba(255,255,255,0.025)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              width: 250, textAlign: "left", background: "var(--surface)",
+              border: "1px solid var(--border)",
               borderRadius: 16, padding: "28px 24px", cursor: "pointer", transition: "all 0.18s",
               position: "relative", overflow: "hidden",
             }}
@@ -655,15 +655,15 @@ function HomePage({ onNavigate }) {
               e.currentTarget.style.transform = "translateY(-3px)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.025)";
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+              e.currentTarget.style.background = "var(--surface)";
+              e.currentTarget.style.borderColor = "var(--border)";
               e.currentTarget.style.transform = "translateY(0)";
             }}
           >
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, borderRadius: "16px 16px 0 0", background: tile.color, opacity: 0.55 }} />
             <div style={{ marginBottom: 18 }}>{tile.icon}</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 8 }}>{tile.title}</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.32)", lineHeight: 1.65 }}>{tile.desc}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>{tile.title}</div>
+            <div style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.65 }}>{tile.desc}</div>
             <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 5 }}>
               <span style={{ fontSize: 11, color: tile.color, fontFamily: "'DM Mono',monospace", fontWeight: 500 }}>Open</span>
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -739,26 +739,26 @@ function DealDetailModal({ deal, pipelines, token, onClose }) {
       onClick={onClose}
     >
       <div
-        style={{ background:"#1a2235", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, width:580, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto", display:"flex", flexDirection:"column" }}
+        style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:16, width:580, maxWidth:"100%", maxHeight:"90vh", overflowY:"auto", display:"flex", flexDirection:"column" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ padding:"22px 24px 18px", borderBottom:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"flex-start", gap:14 }}>
+        <div style={{ padding:"22px 24px 18px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"flex-start", gap:14 }}>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:17, fontWeight:700, color:"var(--text)", lineHeight:1.3, marginBottom:6 }}>
               {p.dealname || "Untitled Deal"}
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <div style={{ width:6, height:6, borderRadius:2, background:dotColor, flexShrink:0 }} />
-              <span style={{ fontSize:11, color:"rgba(255,255,255,0.4)", fontFamily:"'DM Mono',monospace" }}>
+              <span style={{ fontSize:11, color:"var(--text-label)", fontFamily:"'DM Mono',monospace" }}>
                 {stage?.label ?? p.dealstage ?? "—"}
-                {pipeline && <span style={{ color:"rgba(255,255,255,0.2)" }}> · {pipeline.label}</span>}
+                {pipeline && <span style={{ color:"var(--text-faint)" }}> · {pipeline.label}</span>}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, color:"rgba(255,255,255,0.45)", cursor:"pointer", fontSize:16, lineHeight:1, padding:"6px 10px", flexShrink:0 }}
+            style={{ background:"var(--border)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text-label)", cursor:"pointer", fontSize:16, lineHeight:1, padding:"6px 10px", flexShrink:0 }}
           >
             ✕
           </button>
@@ -767,7 +767,7 @@ function DealDetailModal({ deal, pipelines, token, onClose }) {
         {/* Amount hero */}
         {amount > 0 && (
           <div style={{ margin:"18px 24px 0", background: isWon ? "rgba(52,211,153,0.07)" : "rgba(165,243,252,0.06)", border:`1px solid ${isWon ? "rgba(52,211,153,0.2)" : "rgba(165,243,252,0.14)"}`, borderRadius:10, padding:"14px 18px" }}>
-            <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Contract Value</div>
+            <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:6 }}>Contract Value</div>
             <div style={{ fontSize:26, fontWeight:700, color:amtColor, fontFamily:"'DM Mono',monospace", letterSpacing:"-0.5px" }}>
               {formatCurrency(amount)}
             </div>
@@ -778,10 +778,10 @@ function DealDetailModal({ deal, pipelines, token, onClose }) {
         <div style={{ padding:"18px 24px 6px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px 20px" }}>
           {rows.map(r => (
             <div key={r.label} style={r.full ? { gridColumn:"1 / -1" } : {}}>
-              <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>
+              <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4 }}>
                 {r.label}
               </div>
-              <div style={{ fontSize:12, color:"rgba(255,255,255,0.72)", lineHeight:1.55, wordBreak:"break-word" }}>
+              <div style={{ fontSize:12, color:"var(--text-body)", lineHeight:1.55, wordBreak:"break-word" }}>
                 {r.value}
               </div>
             </div>
@@ -789,26 +789,26 @@ function DealDetailModal({ deal, pipelines, token, onClose }) {
         </div>
 
         {/* Contacts section */}
-        <div style={{ margin:"20px 24px 0", borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:16 }}>
-          <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+        <div style={{ margin:"20px 24px 0", borderTop:"1px solid var(--border)", paddingTop:16 }}>
+          <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
             Contacts {!loading && contacts.length > 0 && `(${contacts.length})`}
           </div>
           {loading ? (
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>Loading…</div>
+            <div style={{ fontSize:11, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>Loading…</div>
           ) : contacts.length === 0 ? (
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>No contacts associated</div>
+            <div style={{ fontSize:11, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>No contacts associated</div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {contacts.map(c => {
                 const cp = c.properties || {};
                 const name = [cp.firstname, cp.lastname].filter(Boolean).join(" ") || "Unknown";
                 return (
-                  <div key={c.id} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:8, padding:"10px 13px", display:"flex", flexDirection:"column", gap:3 }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,0.8)" }}>{name}</div>
-                    {cp.jobtitle && <div style={{ fontSize:11, color:"rgba(255,255,255,0.38)" }}>{cp.jobtitle}</div>}
+                  <div key={c.id} style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, padding:"10px 13px", display:"flex", flexDirection:"column", gap:3 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:"var(--text-body)" }}>{name}</div>
+                    {cp.jobtitle && <div style={{ fontSize:11, color:"var(--text-label)" }}>{cp.jobtitle}</div>}
                     <div style={{ display:"flex", gap:14, flexWrap:"wrap", marginTop:2 }}>
                       {cp.email && <a href={`mailto:${cp.email}`} style={{ fontSize:11, color:"#818cf8", textDecoration:"none", fontFamily:"'DM Mono',monospace" }}>{cp.email}</a>}
-                      {cp.phone && <span style={{ fontSize:11, color:"rgba(255,255,255,0.4)", fontFamily:"'DM Mono',monospace" }}>{cp.phone}</span>}
+                      {cp.phone && <span style={{ fontSize:11, color:"var(--text-label)", fontFamily:"'DM Mono',monospace" }}>{cp.phone}</span>}
                     </div>
                   </div>
                 );
@@ -818,26 +818,26 @@ function DealDetailModal({ deal, pipelines, token, onClose }) {
         </div>
 
         {/* Notes section */}
-        <div style={{ margin:"20px 24px 0", borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:16 }}>
-          <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
+        <div style={{ margin:"20px 24px 0", borderTop:"1px solid var(--border)", paddingTop:16 }}>
+          <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:10 }}>
             Notes {!loading && notes.length > 0 && `(${notes.length})`}
           </div>
           {loading ? (
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>Loading…</div>
+            <div style={{ fontSize:11, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>Loading…</div>
           ) : notes.length === 0 ? (
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>No notes found</div>
+            <div style={{ fontSize:11, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>No notes found</div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {notes.map(n => {
                 const np = n.properties || {};
                 const body = np.hs_note_body?.replace(/<[^>]*>/g, "") || "";
                 return (
-                  <div key={n.id} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:8, padding:"10px 13px" }}>
-                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", marginBottom:6 }}>
+                  <div key={n.id} style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, padding:"10px 13px" }}>
+                    <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", marginBottom:6 }}>
                       {fmtDateTime(np.hs_timestamp)}
                     </div>
-                    <div style={{ fontSize:12, color:"rgba(255,255,255,0.65)", lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>
-                      {body || <span style={{ color:"rgba(255,255,255,0.18)" }}>(empty note)</span>}
+                    <div style={{ fontSize:12, color:"var(--text-body)", lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>
+                      {body || <span style={{ color:"var(--text-faint)" }}>(empty note)</span>}
                     </div>
                   </div>
                 );
@@ -847,8 +847,8 @@ function DealDetailModal({ deal, pipelines, token, onClose }) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding:"14px 24px 20px", borderTop:"1px solid rgba(255,255,255,0.05)", marginTop:16 }}>
-          <div style={{ fontSize:10, color:"rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace" }}>
+        <div style={{ padding:"14px 24px 20px", borderTop:"1px solid var(--border)", marginTop:16 }}>
+          <div style={{ fontSize:10, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>
             HubSpot Deal ID: {deal.id}
           </div>
         </div>
@@ -917,8 +917,8 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
               onDrop={(e) => handleDrop(e, stage.id)}
               style={{
                 flexShrink: 0, width: 36,
-                background: isOver ? "rgba(99,102,241,0.07)" : "rgba(255,255,255,0.02)",
-                border: `1px solid ${isOver ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
+                background: isOver ? "rgba(99,102,241,0.07)" : "var(--surface)",
+                border: `1px solid ${isOver ? "rgba(99,102,241,0.4)" : "var(--border)"}`,
                 borderRadius: 12, overflow: "hidden",
                 display: "flex", flexDirection: "column", alignItems: "center",
                 transition: "border 0.12s, background 0.12s",
@@ -929,7 +929,7 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
                 onClick={() => toggleCollapse(stage.id)}
                 style={{
                   background: "none", border: "none", cursor: "pointer",
-                  padding: "10px 0 6px", color: "rgba(255,255,255,0.35)",
+                  padding: "10px 0 6px", color: "var(--text-muted)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: "100%", transition: "color 0.15s",
                 }}
@@ -941,7 +941,7 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
               {/* Rotated label */}
               <div style={{
                 writingMode: "vertical-rl", transform: "rotate(180deg)",
-                fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.4)",
+                fontSize: 10, fontWeight: 600, color: "var(--text-label)",
                 fontFamily: "'DM Sans',sans-serif", letterSpacing: "0.03em",
                 padding: "8px 0", whiteSpace: "nowrap", overflow: "hidden",
                 maxHeight: 160, textOverflow: "ellipsis",
@@ -972,20 +972,20 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
             onDrop={(e) => handleDrop(e, stage.id)}
             style={{
               flexShrink: 0, width: 230,
-              background: isOver ? "rgba(99,102,241,0.07)" : "rgba(255,255,255,0.02)",
-              border: `1px solid ${isOver ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
+              background: isOver ? "rgba(99,102,241,0.07)" : "var(--surface)",
+              border: `1px solid ${isOver ? "rgba(99,102,241,0.4)" : "var(--border)"}`,
               borderRadius: 12, overflow: "hidden",
               transition: "border 0.12s, background 0.12s",
             }}
           >
             {/* Column header */}
-            <div style={{ padding:"11px 13px 9px", borderBottom:"1px solid rgba(255,255,255,0.06)", background:"rgba(255,255,255,0.025)" }}>
+            <div style={{ padding:"11px 13px 9px", borderBottom:"1px solid var(--border)", background:"var(--surface)" }}>
               <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:3 }}>
                 <div style={{ width:7, height:7, borderRadius:2, background:dotColor, flexShrink:0 }} />
-                <span style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.8)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                <span style={{ fontSize:11, fontWeight:600, color:"var(--text-body)", flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                   {stage.label}
                 </span>
-                <span style={{ fontSize:10, color:"rgba(255,255,255,0.3)", fontFamily:"'DM Mono',monospace" }}>
+                <span style={{ fontSize:10, color:"var(--text-muted)", fontFamily:"'DM Mono',monospace" }}>
                   {stageDeals.length}
                 </span>
                 {/* Collapse arrow */}
@@ -993,7 +993,7 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
                   onClick={() => toggleCollapse(stage.id)}
                   style={{
                     background: "none", border: "none", cursor: "pointer",
-                    padding: "2px 2px 2px 4px", color: "rgba(255,255,255,0.25)",
+                    padding: "2px 2px 2px 4px", color: "var(--text-faint)",
                     display: "flex", alignItems: "center", transition: "color 0.15s",
                     flexShrink: 0,
                   }}
@@ -1026,16 +1026,16 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
                     onDragEnd={handleDragEnd}
                     onClick={() => onSelectDeal(deal)}
                     style={{
-                      background: isDragging ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.045)",
-                      border: `1px solid ${isDragging ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.08)"}`,
+                      background: isDragging ? "rgba(99,102,241,0.18)" : "var(--surface)",
+                      border: `1px solid ${isDragging ? "rgba(99,102,241,0.45)" : "var(--border)"}`,
                       borderRadius: 8, padding: "9px 11px",
                       cursor: "pointer", opacity: isDragging ? 0.5 : 1,
                       transition: "opacity 0.1s, border 0.1s, background 0.1s",
                     }}
-                    onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.075)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = isDragging ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.045)"; }}
+                    onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = "var(--hover-bg)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isDragging ? "rgba(99,102,241,0.18)" : "var(--surface)"; }}
                   >
-                    <div style={{ fontSize:12, color:"rgba(255,255,255,0.78)", lineHeight:1.35, marginBottom: (amount > 0 || closeDate) ? 5 : 0 }}>
+                    <div style={{ fontSize:12, color:"var(--text-body)", lineHeight:1.35, marginBottom: (amount > 0 || closeDate) ? 5 : 0 }}>
                       {deal.properties?.dealname || "Untitled deal"}
                     </div>
                     {amount > 0 && (
@@ -1044,7 +1044,7 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
                       </div>
                     )}
                     {closeDate && (
-                      <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", marginTop:3 }}>
+                      <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", marginTop:3 }}>
                         Close {closeDate}
                       </div>
                     )}
@@ -1052,7 +1052,7 @@ function KanbanBoard({ deals, pipeline, onUpdateDealStage, onSelectDeal }) {
                 );
               })}
               {stageDeals.length === 0 && (
-                <div style={{ textAlign:"center", padding:"16px 0", fontSize:10, color: isOver ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.12)", fontFamily:"'DM Mono',monospace", transition:"color 0.12s" }}>
+                <div style={{ textAlign:"center", padding:"16px 0", fontSize:10, color: isOver ? "rgba(99,102,241,0.6)" : "var(--border)", fontFamily:"'DM Mono',monospace", transition:"color 0.12s" }}>
                   {isOver ? "Drop here" : "No deals"}
                 </div>
               )}
@@ -1095,8 +1095,8 @@ function HubSpotPage({ hs }) {
           onClick={hs.onClosePage}
           style={{
             display:"flex", alignItems:"center", gap:6,
-            background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
-            borderRadius:8, padding:"7px 13px", cursor:"pointer", color:"rgba(255,255,255,0.5)",
+            background:"var(--hover-bg)", border:"1px solid var(--border)",
+            borderRadius:8, padding:"7px 13px", cursor:"pointer", color:"var(--text-muted)",
             fontSize:12, fontFamily:"'DM Mono',monospace", transition:"all 0.15s",
           }}
         >
@@ -1107,16 +1107,16 @@ function HubSpotPage({ hs }) {
         </button>
 
         <div style={{ flex:1 }}>
-          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(255,255,255,0.2)", marginBottom:4 }}>
+          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.12em", textTransform:"uppercase", color:"var(--text-faint)", marginBottom:4 }}>
             CRM Integration
           </div>
-          <h1 style={{ fontSize:20, fontWeight:600, color:"#fff", letterSpacing:"-0.3px" }}>HubSpot Deals</h1>
+          <h1 style={{ fontSize:20, fontWeight:600, color:"var(--text)", letterSpacing:"-0.3px" }}>HubSpot Deals</h1>
         </div>
 
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           {/* List / Board toggle */}
           {deals.length > 0 && (
-            <div style={{ display:"flex", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8, padding:2, gap:2 }}>
+            <div style={{ display:"flex", background:"var(--input-bg)", border:"1px solid var(--border)", borderRadius:8, padding:2, gap:2 }}>
               {[{ label:"List", value:false }, { label:"Board", value:true }].map(opt => (
                 <button
                   key={opt.label}
@@ -1124,9 +1124,9 @@ function HubSpotPage({ hs }) {
                   style={{
                     padding:"5px 11px", borderRadius:6, fontSize:11, fontWeight:600,
                     fontFamily:"'DM Mono',monospace", cursor:"pointer", transition:"all 0.15s",
-                    background: boardView === opt.value ? "rgba(255,255,255,0.1)" : "transparent",
+                    background: boardView === opt.value ? "var(--border)" : "transparent",
                     border: "none",
-                    color: boardView === opt.value ? "var(--text)" : "rgba(255,255,255,0.35)",
+                    color: boardView === opt.value ? "var(--text)" : "var(--text-muted)",
                   }}
                 >
                   {opt.label}
@@ -1135,7 +1135,7 @@ function HubSpotPage({ hs }) {
             </div>
           )}
           {lastSync && !syncing && (
-            <span style={{ fontSize:9, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace" }}>
+            <span style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>
               Synced {lastSync.toLocaleTimeString()}
             </span>
           )}
@@ -1144,10 +1144,10 @@ function HubSpotPage({ hs }) {
             disabled={!hs.token.trim() || syncing}
             style={{
               display:"flex", alignItems:"center", gap:6,
-              background: syncing ? "rgba(255,255,255,0.04)" : "rgba(52,211,153,0.12)",
-              border:`1px solid ${syncing ? "rgba(255,255,255,0.08)" : "rgba(52,211,153,0.3)"}`,
+              background: syncing ? "var(--input-bg)" : "rgba(52,211,153,0.12)",
+              border:`1px solid ${syncing ? "var(--border)" : "rgba(52,211,153,0.3)"}`,
               borderRadius:8, padding:"7px 13px", cursor: syncing ? "default" : "pointer",
-              color: syncing ? "rgba(255,255,255,0.25)" : "#6ee7b7",
+              color: syncing ? "var(--text-faint)" : "#6ee7b7",
               fontSize:12, fontWeight:600, fontFamily:"'DM Mono',monospace", transition:"all 0.15s",
             }}
           >
@@ -1165,7 +1165,7 @@ function HubSpotPage({ hs }) {
 
       {/* Syncing empty state */}
       {syncing && deals.length === 0 && (
-        <div style={{ textAlign:"center", padding:"80px 0", color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", fontSize:13 }}>
+        <div style={{ textAlign:"center", padding:"80px 0", color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", fontSize:13 }}>
           Fetching deals…
         </div>
       )}
@@ -1174,17 +1174,17 @@ function HubSpotPage({ hs }) {
       {deals.length > 0 && (
         <div style={{ display:"flex", gap:14, marginBottom:32, flexWrap:"wrap" }}>
           {[
-            { label:"Total Deals",      value: deals.length,       display: `${deals.length}`,                color:"#fff" },
+            { label:"Total Deals",      value: deals.length,       display: `${deals.length}`,                color:"var(--text)" },
             { label:"Closed Won YTD",   value: closedArr,          display: formatCurrency(closedArr),        color:"#6ee7b7" },
             { label:"Open Pipeline",    value: openPipelineValue,  display: formatCurrency(openPipelineValue),color:"#c4b5fd" },
             { label:"Pipelines",        value: pipelines.length,   display: `${pipelines.length}`,            color:"#fcd34d" },
           ].map(card => (
             <div key={card.label} style={{
               flex:1, minWidth:130,
-              background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.07)",
+              background:"var(--surface)", border:"1px solid var(--border)",
               borderRadius:12, padding:"16px 18px",
             }}>
-              <div style={{ fontSize:9, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:8 }}>
+              <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:8 }}>
                 {card.label}
               </div>
               <div style={{ fontSize:22, fontWeight:700, color:card.color, fontFamily:"'DM Mono',monospace", letterSpacing:"-0.5px" }}>
@@ -1209,14 +1209,14 @@ function HubSpotPage({ hs }) {
                   style={{
                     display:"flex", alignItems:"center", gap:7,
                     padding:"7px 14px", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer",
-                    background: activePipelineId === p.id ? "rgba(255,255,255,0.09)" : "transparent",
-                    border:`1px solid ${activePipelineId === p.id ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"}`,
-                    color: activePipelineId === p.id ? "#fff" : "rgba(255,255,255,0.38)",
+                    background: activePipelineId === p.id ? "var(--border)" : "transparent",
+                    border:`1px solid ${activePipelineId === p.id ? "var(--border)" : "var(--border)"}`,
+                    color: activePipelineId === p.id ? "var(--text)" : "var(--text-label)",
                     fontFamily:"'DM Sans',sans-serif", transition:"all 0.15s",
                   }}
                 >
                   {p.label}
-                  <span style={{ fontSize:10, color:"rgba(255,255,255,0.28)", fontFamily:"'DM Mono',monospace" }}>
+                  <span style={{ fontSize:10, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace" }}>
                     {pDeals.length}
                   </span>
                 </button>
@@ -1236,11 +1236,11 @@ function HubSpotPage({ hs }) {
 
           {/* List view */}
           {pipeline && !boardView && (
-            <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, overflow:"hidden" }}>
+            <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden" }}>
               {/* Column headers */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 70px 130px 28px", padding:"10px 16px", borderBottom:"1px solid rgba(255,255,255,0.06)", background:"rgba(255,255,255,0.03)" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 70px 130px 28px", padding:"10px 16px", borderBottom:"1px solid var(--border)", background:"var(--surface)" }}>
                 {["Stage", "Deals", "Value", ""].map((h, i) => (
-                  <span key={h+i} style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", textAlign: i > 0 ? "right" : "left" }}>
+                  <span key={h+i} style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.1em", textTransform:"uppercase", textAlign: i > 0 ? "right" : "left" }}>
                     {h}
                   </span>
                 ))}
@@ -1261,23 +1261,23 @@ function HubSpotPage({ hs }) {
                       onClick={() => stageDeals.length > 0 && setExpandedStageId(isExpanded ? null : stage.id)}
                       style={{
                         display:"grid", gridTemplateColumns:"1fr 70px 130px 28px",
-                        padding:"12px 16px", borderBottom:"1px solid rgba(255,255,255,0.04)",
+                        padding:"12px 16px", borderBottom:"1px solid var(--border)",
                         cursor: stageDeals.length > 0 ? "pointer" : "default",
-                        background: isExpanded ? "rgba(255,255,255,0.035)" : "transparent",
+                        background: isExpanded ? "var(--hover-bg)" : "transparent",
                         transition:"background 0.15s",
                       }}
                     >
                       <div style={{ display:"flex", alignItems:"center", gap:9 }}>
                         <div style={{ width:7, height:7, borderRadius:2, background:dotColor, flexShrink:0 }} />
-                        <span style={{ fontSize:12, color:"rgba(255,255,255,0.78)" }}>{stage.label}</span>
+                        <span style={{ fontSize:12, color:"var(--text-body)" }}>{stage.label}</span>
                       </div>
-                      <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
+                      <span style={{ fontSize:12, color:"var(--text-muted)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
                         {stageDeals.length || "—"}
                       </span>
-                      <span style={{ fontSize:12, fontWeight:600, color: stageValue > 0 ? valueColor : "rgba(255,255,255,0.18)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
+                      <span style={{ fontSize:12, fontWeight:600, color: stageValue > 0 ? valueColor : "var(--text-faint)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
                         {stageValue > 0 ? formatCurrency(stageValue) : "—"}
                       </span>
-                      <span style={{ textAlign:"right", fontSize:9, color:"rgba(255,255,255,0.18)", paddingRight:2 }}>
+                      <span style={{ textAlign:"right", fontSize:9, color:"var(--text-faint)", paddingRight:2 }}>
                         {stageDeals.length > 0 ? (isExpanded ? "▲" : "▼") : ""}
                       </span>
                     </div>
@@ -1290,21 +1290,21 @@ function HubSpotPage({ hs }) {
                         style={{
                           display:"grid", gridTemplateColumns:"1fr 70px 130px 28px",
                           padding:"8px 16px 8px 42px",
-                          borderBottom:"1px solid rgba(255,255,255,0.025)",
-                          background:"rgba(255,255,255,0.012)",
+                          borderBottom:"1px solid var(--border)",
+                          background:"var(--surface)",
                           cursor:"pointer", transition:"background 0.12s",
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.035)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.012)"; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "var(--hover-bg)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "var(--surface)"; }}
                       >
-                        <span style={{ fontSize:11, color:"rgba(255,255,255,0.6)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                        <span style={{ fontSize:11, color:"var(--text-body)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                           {deal.properties?.dealname || "Untitled deal"}
                         </span>
                         <span />
-                        <span style={{ fontSize:11, color:"rgba(255,255,255,0.38)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
+                        <span style={{ fontSize:11, color:"var(--text-label)", fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
                           {parseFloat(deal.properties?.amount) > 0 ? formatCurrency(parseFloat(deal.properties.amount)) : "—"}
                         </span>
-                        <span style={{ textAlign:"right", fontSize:9, color:"rgba(255,255,255,0.18)" }}>›</span>
+                        <span style={{ textAlign:"right", fontSize:9, color:"var(--text-faint)" }}>›</span>
                       </div>
                     ))}
                   </div>
@@ -1317,13 +1317,13 @@ function HubSpotPage({ hs }) {
 
       {/* No data empty state */}
       {!syncing && !error && deals.length === 0 && hs.token && (
-        <div style={{ textAlign:"center", padding:"80px 0", color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", fontSize:12, lineHeight:2 }}>
+        <div style={{ textAlign:"center", padding:"80px 0", color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", fontSize:12, lineHeight:2 }}>
           No deals found.<br/>Click Refresh to sync from HubSpot.
         </div>
       )}
 
       {!hs.token && (
-        <div style={{ textAlign:"center", padding:"80px 0", color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", fontSize:12, lineHeight:2 }}>
+        <div style={{ textAlign:"center", padding:"80px 0", color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", fontSize:12, lineHeight:2 }}>
           Add your HubSpot token in the sidebar to get started.
         </div>
       )}
@@ -1775,15 +1775,15 @@ export default function ARRFlow() {
 
         {/* Header */}
         <div style={{ textAlign:"center", marginBottom:24 }}>
-          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.15em", color:"rgba(255,255,255,0.2)", textTransform:"uppercase", marginBottom:8 }}>Working Backwards · New Logo ARR</div>
-          <h1 style={{ fontSize:22, fontWeight:600, letterSpacing:"-0.5px", color:"#fff", marginBottom:14 }}>Revenue Input Flow</h1>
-          <div style={{ display:"inline-flex", gap:3, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, padding:3 }}>
+          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.15em", color:"var(--text-faint)", textTransform:"uppercase", marginBottom:8 }}>Working Backwards · New Logo ARR</div>
+          <h1 style={{ fontSize:22, fontWeight:600, letterSpacing:"-0.5px", color:"var(--text)", marginBottom:14 }}>Revenue Input Flow</h1>
+          <div style={{ display:"inline-flex", gap:3, background:"var(--hover-bg)", border:"1px solid var(--border)", borderRadius:10, padding:3 }}>
             <button className={`tab ${mode==="explore"?"on":""}`} onClick={()=>setMode("explore")}>Explore</button>
             <button className={`tab ${mode==="calculator"?"on":""}`} onClick={()=>setMode("calculator")}>Calculator</button>
           </div>
-          <button onClick={handleDownload} style={{ marginTop:12, display:"inline-flex", alignItems:"center", gap:6, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"6px 14px", color:"rgba(255,255,255,0.55)", fontSize:12, fontFamily:"'DM Mono',monospace", cursor:"pointer", transition:"all 0.15s" }}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.1)";e.currentTarget.style.color="#fff";}}
-            onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.color="rgba(255,255,255,0.55)";}}>
+          <button onClick={handleDownload} style={{ marginTop:12, display:"inline-flex", alignItems:"center", gap:6, background:"var(--border)", border:"1px solid var(--border)", borderRadius:8, padding:"6px 14px", color:"var(--text-muted)", fontSize:12, fontFamily:"'DM Mono',monospace", cursor:"pointer", transition:"all 0.15s" }}
+            onMouseEnter={e=>{e.currentTarget.style.background="var(--border)";e.currentTarget.style.color="var(--text)";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="var(--border)";e.currentTarget.style.color="var(--text-muted)";}}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5.5l3 3 3-3M1 10h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Download PNG
           </button>
@@ -1798,7 +1798,7 @@ export default function ARRFlow() {
 
         {/* Legend */}
         <div style={{ display:"flex", gap:10, marginBottom:12, alignItems:"center" }}>
-          <span style={{ fontSize:9, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.08em", textTransform:"uppercase", marginRight:2 }}>Click a node to label it:</span>
+          <span style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", letterSpacing:"0.08em", textTransform:"uppercase", marginRight:2 }}>Click a node to label it:</span>
           {Object.entries(NODE_TYPE_CONFIG).map(([, cfg]) => (
             <div key={cfg.label} style={{ display:"inline-flex", alignItems:"center", gap:4, background:cfg.bg, border:`1px solid ${cfg.border}`, borderRadius:20, padding:"2px 9px" }}>
               <span style={{ fontSize:9, fontWeight:600, color:cfg.color, fontFamily:"'DM Mono',monospace", letterSpacing:"0.06em" }}>{cfg.label}</span>
@@ -1817,17 +1817,17 @@ export default function ARRFlow() {
         <div style={{ width:"100%", maxWidth:960, display:"flex", flexDirection:"column", alignItems:"center" }}>
           <div style={{ width:"70%", maxWidth:600, position:"relative", height:36 }}>
             <svg width="100%" height="36" viewBox="0 0 600 36" preserveAspectRatio="none">
-              <path d="M100 0 Q100 36 300 36" stroke="rgba(255,255,255,0.09)" strokeWidth="1.5" fill="none"/>
-              <path d="M300 0 Q300 36 300 36" stroke="rgba(255,255,255,0.09)" strokeWidth="1.5" fill="none"/>
-              <path d="M500 0 Q500 36 300 36" stroke="rgba(255,255,255,0.09)" strokeWidth="1.5" fill="none"/>
+              <path d="M100 0 Q100 36 300 36" stroke="var(--border)" strokeWidth="1.5" fill="none"/>
+              <path d="M300 0 Q300 36 300 36" stroke="var(--border)" strokeWidth="1.5" fill="none"/>
+              <path d="M500 0 Q500 36 300 36" stroke="var(--border)" strokeWidth="1.5" fill="none"/>
             </svg>
           </div>
 
           {/* Combined box */}
-          <div className="fadein" style={{ width:"100%", maxWidth:560, borderRadius:18, background:"linear-gradient(135deg,rgba(139,92,246,0.08),rgba(16,185,129,0.06))", border:"1px solid rgba(255,255,255,0.09)", padding:"24px 28px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+          <div className="fadein" style={{ width:"100%", maxWidth:560, borderRadius:18, background:"linear-gradient(135deg,rgba(139,92,246,0.08),rgba(16,185,129,0.06))", border:"1px solid var(--border)", padding:"24px 28px", textAlign:"center", position:"relative", overflow:"hidden" }}>
             <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse at 20% 50%,rgba(139,92,246,0.07) 0%,transparent 55%), radial-gradient(ellipse at 80% 50%,rgba(16,185,129,0.07) 0%,transparent 55%)", pointerEvents:"none" }} />
 
-            <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(255,255,255,0.25)", marginBottom:8 }}>
+            <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--text-faint)", marginBottom:8 }}>
               Total New Logo ARR
             </div>
 
@@ -1840,11 +1840,11 @@ export default function ARRFlow() {
               <div style={{ display:"flex", justifyContent:"center", gap:0, marginTop:4 }}>
                 {channels.map((ch, i) => (
                   <div key={ch.label} style={{ display:"flex", alignItems:"stretch" }}>
-                    {i>0 && <div style={{ width:1, background:"rgba(255,255,255,0.1)", margin:"0 16px" }} />}
+                    {i>0 && <div style={{ width:1, background:"var(--border)", margin:"0 16px" }} />}
                     <div style={{ textAlign:"center" }}>
                       <div style={{ fontSize:10, color:`${ch.color}99`, fontFamily:"'DM Mono',monospace", marginBottom:3, letterSpacing:"0.07em" }}>{ch.label}</div>
                       <div style={{ fontSize:14, fontWeight:700, color:ch.color, fontFamily:"'DM Mono',monospace" }}>{formatCurrency(ch.arr)}</div>
-                      <div style={{ fontSize:10, color:"rgba(255,255,255,0.2)", fontFamily:"'DM Mono',monospace", marginTop:2 }}>{ch.pct}%</div>
+                      <div style={{ fontSize:10, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", marginTop:2 }}>{ch.pct}%</div>
                     </div>
                   </div>
                 ))}
@@ -1862,16 +1862,16 @@ export default function ARRFlow() {
 
             {/* HubSpot: Closed YTD vs Projected */}
             {mode === "calculator" && hsDeals.length > 0 && (
-              <div style={{ marginTop:18, paddingTop:14, borderTop:"1px solid rgba(255,255,255,0.07)", display:"flex", justifyContent:"center", gap:0 }}>
+              <div style={{ marginTop:18, paddingTop:14, borderTop:"1px solid var(--border)", display:"flex", justifyContent:"center", gap:0 }}>
                 {[
                   { label:"PROJECTED",  value:total,                          color:"#c4b5fd" },
                   { label:"CLOSED YTD", value:closedArr,                      color:"#6ee7b7" },
-                  { label:"REMAINING",  value:Math.max(0, total - closedArr), color:"rgba(255,255,255,0.35)" },
+                  { label:"REMAINING",  value:Math.max(0, total - closedArr), color:"var(--text-muted)" },
                 ].map((item, i) => (
                   <div key={item.label} style={{ display:"flex", alignItems:"stretch" }}>
-                    {i > 0 && <div style={{ width:1, background:"rgba(255,255,255,0.08)", margin:"0 14px" }} />}
+                    {i > 0 && <div style={{ width:1, background:"var(--border)", margin:"0 14px" }} />}
                     <div style={{ textAlign:"center" }}>
-                      <div style={{ fontSize:9, color:"rgba(255,255,255,0.25)", fontFamily:"'DM Mono',monospace", marginBottom:3, letterSpacing:"0.07em" }}>{item.label}</div>
+                      <div style={{ fontSize:9, color:"var(--text-faint)", fontFamily:"'DM Mono',monospace", marginBottom:3, letterSpacing:"0.07em" }}>{item.label}</div>
                       <div style={{ fontSize:13, fontWeight:700, color:item.color, fontFamily:"'DM Mono',monospace" }}>{formatCurrency(item.value)}</div>
                     </div>
                   </div>
@@ -1880,8 +1880,8 @@ export default function ARRFlow() {
             )}
 
             {mode === "explore" && (
-              <p style={{ fontSize:13, color:"rgba(255,255,255,0.28)", lineHeight:1.65 }}>
-                Three channels converge into one output. Switch to <span style={{ color:"rgba(255,255,255,0.5)" }}>Calculator mode</span> to see your total ARR and channel mix.
+              <p style={{ fontSize:13, color:"var(--text-faint)", lineHeight:1.65 }}>
+                Three channels converge into one output. Switch to <span style={{ color:"var(--text-muted)" }}>Calculator mode</span> to see your total ARR and channel mix.
               </p>
             )}
           </div>
@@ -1899,7 +1899,7 @@ export default function ARRFlow() {
         {/* Explore legend */}
         {mode === "explore" && (
           <div className="fadein" style={{ marginTop:28, maxWidth:560, textAlign:"center" }}>
-            <p style={{ fontSize:13, color:"rgba(255,255,255,0.27)", lineHeight:1.8 }}>
+            <p style={{ fontSize:13, color:"var(--text-faint)", lineHeight:1.8 }}>
               <span style={{ color:"rgba(139,92,246,0.8)" }}>Outbound</span> scales with headcount and is your highest-volume channel.{" "}
               <span style={{ color:"rgba(245,158,11,0.8)" }}>In-person</span> tends to close at higher ACV but top-of-funnel is constrained by time.{" "}
               <span style={{ color:"rgba(16,185,129,0.8)" }}>Podcast</span> is a slow-burn channel — guests convert at high rates but volume is limited by recording cadence. Together they give you a resilient, diversified revenue model.
