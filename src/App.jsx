@@ -11,6 +11,7 @@ import { fetchAllDeals, fetchPipelines, closedArrForYear, updateDealStage, fetch
 import PipelinePage from "./PipelinePage";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
+import TodosPage from "./TodosPage";
 
 const ADMIN_EMAIL = "admin@uniqlearn.co";
 
@@ -300,6 +301,17 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
           <rect x="1" y="8" width="3" height="5" rx="0.6" fill={active ? "#a5b4fc" : "var(--text-muted)"}/>
           <rect x="5.5" y="5" width="3" height="8" rx="0.6" fill={active ? "#a5b4fc" : "var(--text-muted)"}/>
           <rect x="10" y="1" width="3" height="12" rx="0.6" fill={active ? "#a5b4fc" : "var(--text-muted)"}/>
+        </svg>
+      ),
+    },
+    {
+      id: "todos",
+      label: "Notes & Todos",
+      color: "#f59e0b",
+      icon: (active) => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1.5" y="1.5" width="11" height="11" rx="2" stroke={active ? "#fcd34d" : "var(--text-muted)"} strokeWidth="1.3"/>
+          <path d="M4 5h6M4 7.5h4M4 10h5" stroke={active ? "#fcd34d" : "var(--text-muted)"} strokeWidth="1.2" strokeLinecap="round"/>
         </svg>
       ),
     },
@@ -1860,6 +1872,9 @@ export default function ARRFlow() {
 
       {/* Pipeline page */}
       {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} hsToken={hsToken} onHsDealClosed={handleHsDealClosed} />}
+
+      {/* Notes & Todos page (user-specific) */}
+      {view === "todos" && <TodosPage currentUser={currentUser} />}
 
       {/* Admin panel (admin only) */}
       {view === "admin" && isAdmin && <AdminPanel currentUser={currentUser} onNavigate={setView} />}
