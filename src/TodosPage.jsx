@@ -651,6 +651,17 @@ function MeetingTodosPanel({ currentUser }) {
     }
   }
 
+  function toggleAllForMeeting(transcriptId, actionItems) {
+    const keys = actionItems.map((_, idx) => `${transcriptId}_${idx}`);
+    const allDone = keys.every(k => checked[k]);
+    const next = { ...checked };
+    keys.forEach(k => { next[k] = !allDone; });
+    setChecked(next);
+    if (docRef.current) {
+      setDoc(docRef.current, { meetingChecked: next }, { merge: true }).catch(() => {});
+    }
+  }
+
   function saveToken() {
     const t = inputToken.trim();
     setFirefliesToken(t);
@@ -762,6 +773,23 @@ function MeetingTodosPanel({ currentUser }) {
 
   // ── Connected ─────────────────────────────────────────────────────────────
   const groups = transcripts ? groupTranscripts(transcripts) : [];
+
+  // Split meetings into active/completed per group
+  const activeGroups = [];
+  const completedGroups = [];
+  for (const group of groups) {
+    const activeItems = [];
+    const completedItems = [];
+    for (const item of group.items) {
+      const keys = item.actionItems.map((_, idx) => `${item.transcript.id}_${idx}`);
+      const allDone = keys.length > 0 && keys.every(k => checked[k]);
+      if (allDone) completedItems.push(item);
+      else activeItems.push(item);
+    }
+    if (activeItems.length > 0) activeGroups.push({ ...group, items: activeItems });
+    if (completedItems.length > 0) completedGroups.push({ ...group, items: completedItems });
+  }
+
   const totalOpen = groups.reduce((sum, g) =>
     sum + g.items.reduce((s, item) =>
       s + item.actionItems.filter((_, idx) => !checked[`${item.transcript.id}_${idx}`]).length, 0), 0);
@@ -861,9 +889,9 @@ function MeetingTodosPanel({ currentUser }) {
           </div>
         )}
 
-        {/* Deal groups */}
-        {groups.map(group => {
-          const isCollapsed = !!collapsed[group.key];
+        {/* Active deal groups */}
+        {activeGroups.map(group => {
+          const isCollapsed = collapsed[group.key] !== false;
           const groupTotal = group.items.reduce((s, i) => s + i.actionItems.length, 0);
           const groupDone = group.items.reduce((s, item) =>
             s + item.actionItems.filter((_, idx) => !!checked[`${item.transcript.id}_${idx}`]).length, 0);
@@ -872,7 +900,7 @@ function MeetingTodosPanel({ currentUser }) {
             <div key={group.key} style={{ marginBottom: 18 }}>
               {/* Group header */}
               <button
-                onClick={() => setCollapsed(c => ({ ...c, [group.key]: !c[group.key] }))}
+                onClick={() => setCollapsed(c => ({ ...c, [group.key]: c[group.key] === false }))}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 8,
                   background: "transparent", border: "none", cursor: "pointer",
@@ -901,10 +929,11 @@ function MeetingTodosPanel({ currentUser }) {
               {!isCollapsed && (
                 <div style={{ border: "1px solid #1e3a5f", borderRadius: 12, overflow: "hidden" }}>
                   {group.items.map((item, mIdx) => {
-                    // date may be ms or s
                     const rawDate = item.transcript.date;
                     const d = rawDate ? new Date(rawDate > 1e12 ? rawDate : rawDate * 1000) : null;
                     const dateStr = d && !isNaN(d) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+                    const meetingKeys = item.actionItems.map((_, idx) => `${item.transcript.id}_${idx}`);
+                    const meetingAllDone = meetingKeys.length > 0 && meetingKeys.every(k => checked[k]);
 
                     return (
                       <div
@@ -916,6 +945,23 @@ function MeetingTodosPanel({ currentUser }) {
                           background: "#0f172a", padding: "9px 16px",
                           display: "flex", alignItems: "center", gap: 8,
                         }}>
+                          <button
+                            onClick={() => toggleAllForMeeting(item.transcript.id, item.actionItems)}
+                            title={meetingAllDone ? "Uncheck all" : "Check all todos for this meeting"}
+                            style={{
+                              width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+                              background: meetingAllDone ? "#4ade80" : "transparent",
+                              border: `1.5px solid ${meetingAllDone ? "#4ade80" : "#475569"}`,
+                              cursor: "pointer", display: "flex", alignItems: "center",
+                              justifyContent: "center", transition: "all 0.15s", padding: 0,
+                            }}
+                          >
+                            {meetingAllDone && (
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                <path d="M1.5 5L3.8 7.5L8.5 2.5" stroke="#09090e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </button>
                           <span style={{ fontSize: 11, color: "#64748b", fontFamily: "'DM Sans',sans-serif", flex: 1 }}>
                             {item.transcript.title}
                           </span>
@@ -981,6 +1027,132 @@ function MeetingTodosPanel({ currentUser }) {
             </div>
           );
         })}
+
+        {/* Completed section */}
+        {completedGroups.length > 0 && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "32px 0 16px" }}>
+              <div style={{ flex: 1, height: 1, background: "#1e3a5f" }} />
+              <span style={{ fontSize: 10, color: "#475569", fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                Completed
+              </span>
+              <div style={{ flex: 1, height: 1, background: "#1e3a5f" }} />
+            </div>
+
+            {completedGroups.map(group => {
+              const doneKey = `done_${group.key}`;
+              const isCollapsed = collapsed[doneKey] !== false;
+              const groupTotal = group.items.reduce((s, i) => s + i.actionItems.length, 0);
+
+              return (
+                <div key={group.key} style={{ marginBottom: 18, opacity: 0.6 }}>
+                  <button
+                    onClick={() => setCollapsed(c => ({ ...c, [doneKey]: c[doneKey] === false }))}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 8,
+                      background: "transparent", border: "none", cursor: "pointer",
+                      padding: "6px 0", marginBottom: isCollapsed ? 0 : 10, textAlign: "left",
+                    }}
+                  >
+                    <span style={{
+                      color: "#475569", fontSize: 9, transition: "transform 0.15s",
+                      transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)", display: "inline-block",
+                    }}>▼</span>
+                    <span style={{
+                      fontSize: 13, fontWeight: group.key === "__unlinked__" ? 500 : 700,
+                      color: group.key === "__unlinked__" ? "#475569" : "#94a3b8",
+                      fontFamily: "'DM Sans',sans-serif",
+                    }}>
+                      {group.key === "__unlinked__" ? "Unlinked Meetings" : group.dealName}
+                    </span>
+                    <span style={{ marginLeft: "auto", fontSize: 10, fontFamily: "'DM Mono',monospace", color: "#4ade80" }}>
+                      {groupTotal}/{groupTotal}
+                    </span>
+                  </button>
+
+                  {!isCollapsed && (
+                    <div style={{ border: "1px solid #1e3a5f", borderRadius: 12, overflow: "hidden" }}>
+                      {group.items.map((item, mIdx) => {
+                        const rawDate = item.transcript.date;
+                        const d = rawDate ? new Date(rawDate > 1e12 ? rawDate : rawDate * 1000) : null;
+                        const dateStr = d && !isNaN(d) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+
+                        return (
+                          <div
+                            key={item.transcript.id}
+                            style={{ borderBottom: mIdx < group.items.length - 1 ? "1px solid #1e3a5f" : "none" }}
+                          >
+                            <div style={{
+                              background: "#0f172a", padding: "9px 16px",
+                              display: "flex", alignItems: "center", gap: 8,
+                            }}>
+                              <button
+                                onClick={() => toggleAllForMeeting(item.transcript.id, item.actionItems)}
+                                title="Uncheck all"
+                                style={{
+                                  width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+                                  background: "#4ade80", border: "1.5px solid #4ade80",
+                                  cursor: "pointer", display: "flex", alignItems: "center",
+                                  justifyContent: "center", padding: 0,
+                                }}
+                              >
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                  <path d="M1.5 5L3.8 7.5L8.5 2.5" stroke="#09090e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              </button>
+                              <span style={{ fontSize: 11, color: "#475569", fontFamily: "'DM Sans',sans-serif", flex: 1, textDecoration: "line-through" }}>
+                                {item.transcript.title}
+                              </span>
+                              {dateStr && (
+                                <span style={{ fontSize: 10, color: "#334155", fontFamily: "'DM Mono',monospace" }}>
+                                  {dateStr}
+                                </span>
+                              )}
+                            </div>
+                            {item.actionItems.map((todo, idx) => {
+                              const key = `${item.transcript.id}_${idx}`;
+                              return (
+                                <div
+                                  key={key}
+                                  style={{
+                                    display: "flex", alignItems: "flex-start", gap: 10,
+                                    padding: "10px 16px", borderTop: "1px solid #0f172a",
+                                    background: "rgba(74,222,128,0.025)",
+                                  }}
+                                >
+                                  <button
+                                    onClick={() => toggleChecked(key)}
+                                    style={{
+                                      width: 17, height: 17, borderRadius: 4, flexShrink: 0, marginTop: 2,
+                                      background: "#4ade80", border: "1.5px solid #4ade80",
+                                      cursor: "pointer", display: "flex", alignItems: "center",
+                                      justifyContent: "center", padding: 0,
+                                    }}
+                                  >
+                                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                      <path d="M1.5 5L3.8 7.5L8.5 2.5" stroke="#09090e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                  <span style={{
+                                    fontSize: 13, color: "#475569",
+                                    fontFamily: "'DM Sans',sans-serif", lineHeight: 1.55,
+                                    textDecoration: "line-through",
+                                  }}>
+                                    {todo}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
     </div>
   );
