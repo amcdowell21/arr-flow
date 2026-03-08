@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "./firebase";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDocs, collection } from "firebase/firestore";
+import {
+  getFirefliesToken, setFirefliesToken,
+  fetchTranscripts, parseActionItems, matchDeal,
+} from "./fireflies";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function genId() { return Math.random().toString(36).slice(2, 11); }
@@ -477,8 +481,514 @@ function BlockRow({
   );
 }
 
+// ── Deal Link Picker ──────────────────────────────────────────────────────────
+function DealLinkPicker({ transcriptId, linkMode, linkedDealId, deals, onLink }) {
+  const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef(null);
+
+  const currentDeal = linkedDealId && linkedDealId !== "__none__"
+    ? deals.find(d => d.id === linkedDealId) : null;
+
+  function openPicker(e) {
+    e.stopPropagation();
+    const rect = btnRef.current.getBoundingClientRect();
+    setDropPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e) {
+      if (!e.target.closest("[data-deallink-drop]")) setOpen(false);
+    }
+    setTimeout(() => document.addEventListener("mousedown", onDown), 0);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const btnLabel = linkMode === "manual"
+    ? `🔗 ${currentDeal?.name || "Linked"}`
+    : linkMode === "auto"
+      ? "✦ Auto"
+      : "+ Link to deal";
+
+  const btnStyle = {
+    background: linkMode === "manual" ? "rgba(99,102,241,0.12)" : linkMode === "auto" ? "rgba(255,255,255,0.04)" : "transparent",
+    border: `1px solid ${linkMode === "manual" ? "rgba(99,102,241,0.3)" : linkMode === "auto" ? "#334155" : "#334155"}`,
+    borderRadius: 6, padding: "2px 8px", cursor: "pointer",
+    fontSize: 10, fontFamily: "'DM Sans',sans-serif", fontWeight: 500,
+    color: linkMode === "manual" ? "#a5b4fc" : linkMode === "auto" ? "#64748b" : "#475569",
+    whiteSpace: "nowrap", flexShrink: 0,
+  };
+
+  const sortedDeals = [...deals].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  return (
+    <>
+      <button ref={btnRef} onClick={openPicker} style={btnStyle}
+        onMouseEnter={e => { if (linkMode === "none") e.currentTarget.style.color = "#94a3b8"; }}
+        onMouseLeave={e => { if (linkMode === "none") e.currentTarget.style.color = "#475569"; }}
+      >
+        {btnLabel}
+      </button>
+
+      {open && (
+        <div
+          data-deallink-drop
+          style={{
+            position: "fixed", top: dropPos.top, right: dropPos.right,
+            background: "#1e293b", border: "1px solid #334155",
+            borderRadius: 10, boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
+            zIndex: 3000, minWidth: 220, maxHeight: 320, overflowY: "auto",
+            fontFamily: "'DM Sans',sans-serif",
+          }}
+        >
+          <div style={{ padding: "6px 12px 5px", borderBottom: "1px solid #1e3a5f", fontSize: 9, color: "#475569", fontFamily: "'DM Mono',monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Link to deal
+          </div>
+          {[
+            { id: "__auto__", label: "✦ Auto-detect", sub: "Use name / email matching" },
+            { id: "__none__", label: "— No deal", sub: "Keep in unlinked" },
+          ].map(opt => (
+            <button
+              key={opt.id}
+              data-deallink-drop
+              onClick={() => { onLink(opt.id === "__auto__" ? undefined : "__none__"); setOpen(false); }}
+              style={{
+                width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start",
+                padding: "7px 12px", background: "transparent", border: "none",
+                cursor: "pointer", textAlign: "left",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.1)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <span style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 500 }}>{opt.label}</span>
+              <span style={{ fontSize: 10, color: "#475569" }}>{opt.sub}</span>
+            </button>
+          ))}
+          <div style={{ borderTop: "1px solid #1e3a5f", margin: "4px 0" }} />
+          {sortedDeals.map(d => (
+            <button
+              key={d.id}
+              data-deallink-drop
+              onClick={() => { onLink(d.id); setOpen(false); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center",
+                padding: "7px 12px", background: "transparent", border: "none",
+                cursor: "pointer", textAlign: "left",
+                borderLeft: `2px solid ${d.id === linkedDealId ? "#6366f1" : "transparent"}`,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.1)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <span style={{ fontSize: 12, color: d.id === linkedDealId ? "#a5b4fc" : "#e2e8f0" }}>{d.name || "Unnamed deal"}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Meeting Todos Panel ───────────────────────────────────────────────────────
+function MeetingTodosPanel({ currentUser }) {
+  const [ffToken, setFfToken] = useState(() => getFirefliesToken());
+  const [inputToken, setInputToken] = useState("");
+  const [transcripts, setTranscripts] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [deals, setDeals] = useState([]);
+  const [checked, setChecked] = useState({});
+  const [meetingLinks, setMeetingLinks] = useState({}); // { transcriptId: dealId | "__none__" }
+  const [collapsed, setCollapsed] = useState({});
+  const [lastSync, setLastSync] = useState(null);
+  const docRef = useRef(null);
+  const didAutoSync = useRef(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    docRef.current = doc(db, "userNotes", currentUser.uid);
+
+    const unsub = onSnapshot(docRef.current, snap => {
+      if (snap.exists()) {
+        setChecked(snap.data().meetingChecked || {});
+        setMeetingLinks(snap.data().meetingDealLinks || {});
+      }
+    });
+
+    getDocs(collection(db, "pipelineDeals")).then(snap => {
+      setDeals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    if (ffToken && !didAutoSync.current) {
+      didAutoSync.current = true;
+      doSync();
+    }
+
+    return unsub;
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function doSync() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchTranscripts();
+      setTranscripts(data);
+      setLastSync(new Date());
+    } catch (e) {
+      if (e.message === "NO_TOKEN") setError("No API key set.");
+      else setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleChecked(key) {
+    const next = { ...checked, [key]: !checked[key] };
+    setChecked(next);
+    if (docRef.current) {
+      setDoc(docRef.current, { meetingChecked: next }, { merge: true }).catch(() => {});
+    }
+  }
+
+  function saveToken() {
+    const t = inputToken.trim();
+    setFirefliesToken(t);
+    setFfToken(t);
+    setInputToken("");
+    doSync();
+  }
+
+  function disconnect() {
+    setFirefliesToken("");
+    setFfToken("");
+    setTranscripts(null);
+    setError(null);
+  }
+
+  function saveMeetingLink(transcriptId, dealId) {
+    setMeetingLinks(prev => {
+      const next = { ...prev };
+      if (dealId === undefined) delete next[transcriptId]; // revert to auto
+      else next[transcriptId] = dealId;
+      setDoc(docRef.current, { meetingDealLinks: next }, { merge: true }).catch(() => {});
+      return next;
+    });
+  }
+
+  function groupTranscripts(list) {
+    const groups = {};
+    for (const t of list) {
+      const items = parseActionItems(t.summary?.action_items);
+      if (!items.length) continue;
+
+      let linked = null;
+      let linkMode = "none"; // "auto" | "manual" | "none"
+      const manualLink = meetingLinks[t.id];
+
+      if (manualLink !== undefined) {
+        if (manualLink === "__none__") {
+          linkMode = "none";
+        } else {
+          linked = deals.find(d => d.id === manualLink) || null;
+          linkMode = linked ? "manual" : "none";
+        }
+      } else {
+        linked = matchDeal(t.title, t.participants, deals);
+        linkMode = linked ? "auto" : "none";
+      }
+
+      const key = linked ? (linked.name || linked.id) : "__unlinked__";
+      if (!groups[key]) groups[key] = { key, dealName: linked?.name || null, items: [] };
+      groups[key].items.push({ transcript: t, actionItems: items, linked, linkMode });
+    }
+    return Object.values(groups).sort((a, b) => {
+      if (a.key === "__unlinked__") return 1;
+      if (b.key === "__unlinked__") return -1;
+      return (a.dealName || "").localeCompare(b.dealName || "");
+    });
+  }
+
+  // ── Not connected ─────────────────────────────────────────────────────────
+  if (!ffToken) {
+    return (
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ maxWidth: 480, margin: "0 auto", padding: "80px 40px", textAlign: "center" }}>
+          <div style={{ fontSize: 42, marginBottom: 18 }}>🔥</div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "#f1f5f9", marginBottom: 10, fontFamily: "'DM Sans',sans-serif" }}>
+            Connect Fireflies
+          </h2>
+          <p style={{ fontSize: 13, color: "#64748b", marginBottom: 28, fontFamily: "'DM Sans',sans-serif", lineHeight: 1.7 }}>
+            Paste your Fireflies API key to pull action items from your meeting transcripts,
+            automatically grouped by deal.
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={inputToken}
+              onChange={e => setInputToken(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && inputToken.trim() && saveToken()}
+              placeholder="Fireflies API key…"
+              type="password"
+              style={{
+                flex: 1, background: "#0f172a", border: "1px solid #334155", borderRadius: 8,
+                padding: "10px 14px", color: "#e2e8f0", fontSize: 13,
+                fontFamily: "'DM Mono',monospace", outline: "none",
+              }}
+            />
+            <button
+              onClick={saveToken}
+              disabled={!inputToken.trim()}
+              style={{
+                background: "#6366f1", border: "none", borderRadius: 8, padding: "10px 18px",
+                color: "#fff", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+                cursor: inputToken.trim() ? "pointer" : "not-allowed", opacity: inputToken.trim() ? 1 : 0.5,
+              }}
+            >
+              Connect
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: "#475569", marginTop: 14, fontFamily: "'DM Mono',monospace" }}>
+            app.fireflies.ai → Integrations → API Key
+          </p>
+          {error && (
+            <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: "#f87171", fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Connected ─────────────────────────────────────────────────────────────
+  const groups = transcripts ? groupTranscripts(transcripts) : [];
+  const totalOpen = groups.reduce((sum, g) =>
+    sum + g.items.reduce((s, item) =>
+      s + item.actionItems.filter((_, idx) => !checked[`${item.transcript.id}_${idx}`]).length, 0), 0);
+  const totalDone = groups.reduce((sum, g) =>
+    sum + g.items.reduce((s, item) =>
+      s + item.actionItems.filter((_, idx) => !!checked[`${item.transcript.id}_${idx}`]).length, 0), 0);
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "52px 80px 240px" }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
+          <h1 style={{
+            fontSize: 38, fontWeight: 800, color: "#f1f5f9",
+            fontFamily: "'DM Sans',sans-serif", flex: 1, margin: 0,
+          }}>
+            Meeting Todos
+          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {lastSync && (
+              <span style={{ fontSize: 10, color: "#475569", fontFamily: "'DM Mono',monospace" }}>
+                {lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            <button
+              onClick={doSync}
+              disabled={loading}
+              style={{
+                background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
+                padding: "7px 14px", color: loading ? "#475569" : "#e2e8f0",
+                fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+                cursor: loading ? "not-allowed" : "pointer",
+              }}
+            >
+              {loading ? "Syncing…" : "↻ Sync"}
+            </button>
+            <button
+              onClick={disconnect}
+              title="Disconnect Fireflies"
+              style={{
+                background: "transparent", border: "1px solid #334155", borderRadius: 8,
+                padding: "7px 10px", color: "#64748b", fontSize: 11,
+                fontFamily: "'DM Mono',monospace", cursor: "pointer",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#64748b"; }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{
+            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+            borderRadius: 10, padding: "12px 16px", marginBottom: 20,
+            color: "#f87171", fontSize: 12, fontFamily: "'DM Sans',sans-serif",
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Loading / empty states */}
+        {loading && !transcripts && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", fontFamily: "'DM Mono',monospace", fontSize: 12 }}>
+            Pulling from Fireflies…
+          </div>
+        )}
+        {!loading && transcripts !== null && groups.length === 0 && (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}>
+            No action items found in recent transcripts.
+          </div>
+        )}
+
+        {/* Stats */}
+        {groups.length > 0 && (
+          <div style={{ display: "flex", gap: 12, marginBottom: 28 }}>
+            {[
+              { label: "Open", value: totalOpen, color: "#f1f5f9" },
+              { label: "Done", value: totalDone, color: "#4ade80" },
+              { label: "Deals", value: groups.filter(g => g.key !== "__unlinked__").length, color: "#a5b4fc" },
+            ].map(stat => (
+              <div key={stat.label} style={{
+                background: "#1e293b", border: "1px solid #334155", borderRadius: 10,
+                padding: "12px 18px", flex: 1,
+              }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: stat.color, fontFamily: "'DM Mono',monospace" }}>
+                  {stat.value}
+                </div>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Deal groups */}
+        {groups.map(group => {
+          const isCollapsed = !!collapsed[group.key];
+          const groupTotal = group.items.reduce((s, i) => s + i.actionItems.length, 0);
+          const groupDone = group.items.reduce((s, item) =>
+            s + item.actionItems.filter((_, idx) => !!checked[`${item.transcript.id}_${idx}`]).length, 0);
+
+          return (
+            <div key={group.key} style={{ marginBottom: 18 }}>
+              {/* Group header */}
+              <button
+                onClick={() => setCollapsed(c => ({ ...c, [group.key]: !c[group.key] }))}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 8,
+                  background: "transparent", border: "none", cursor: "pointer",
+                  padding: "6px 0", marginBottom: isCollapsed ? 0 : 10, textAlign: "left",
+                }}
+              >
+                <span style={{
+                  color: "#475569", fontSize: 9, transition: "transform 0.15s",
+                  transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)", display: "inline-block",
+                }}>▼</span>
+                <span style={{
+                  fontSize: 13, fontWeight: group.key === "__unlinked__" ? 500 : 700,
+                  color: group.key === "__unlinked__" ? "#64748b" : "#f1f5f9",
+                  fontFamily: "'DM Sans',sans-serif",
+                }}>
+                  {group.key === "__unlinked__" ? "Unlinked Meetings" : group.dealName}
+                </span>
+                <span style={{
+                  marginLeft: "auto", fontSize: 10, fontFamily: "'DM Mono',monospace",
+                  color: groupDone === groupTotal ? "#4ade80" : "#64748b",
+                }}>
+                  {groupDone}/{groupTotal}
+                </span>
+              </button>
+
+              {!isCollapsed && (
+                <div style={{ border: "1px solid #1e3a5f", borderRadius: 12, overflow: "hidden" }}>
+                  {group.items.map((item, mIdx) => {
+                    // date may be ms or s
+                    const rawDate = item.transcript.date;
+                    const d = rawDate ? new Date(rawDate > 1e12 ? rawDate : rawDate * 1000) : null;
+                    const dateStr = d && !isNaN(d) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+
+                    return (
+                      <div
+                        key={item.transcript.id}
+                        style={{ borderBottom: mIdx < group.items.length - 1 ? "1px solid #1e3a5f" : "none" }}
+                      >
+                        {/* Meeting sub-header */}
+                        <div style={{
+                          background: "#0f172a", padding: "9px 16px",
+                          display: "flex", alignItems: "center", gap: 8,
+                        }}>
+                          <span style={{ fontSize: 11, color: "#64748b", fontFamily: "'DM Sans',sans-serif", flex: 1 }}>
+                            {item.transcript.title}
+                          </span>
+                          {dateStr && (
+                            <span style={{ fontSize: 10, color: "#334155", fontFamily: "'DM Mono',monospace" }}>
+                              {dateStr}
+                            </span>
+                          )}
+                          <DealLinkPicker
+                            transcriptId={item.transcript.id}
+                            linkMode={item.linkMode}
+                            linkedDealId={item.linkMode === "manual" ? meetingLinks[item.transcript.id] : item.linked?.id}
+                            deals={deals}
+                            onLink={dealId => saveMeetingLink(item.transcript.id, dealId)}
+                          />
+                        </div>
+
+                        {/* Action items */}
+                        {item.actionItems.map((todo, idx) => {
+                          const key = `${item.transcript.id}_${idx}`;
+                          const isDone = !!checked[key];
+                          return (
+                            <div
+                              key={key}
+                              style={{
+                                display: "flex", alignItems: "flex-start", gap: 10,
+                                padding: "10px 16px", borderTop: "1px solid #0f172a",
+                                background: isDone ? "rgba(74,222,128,0.025)" : "transparent",
+                              }}
+                            >
+                              <button
+                                onClick={() => toggleChecked(key)}
+                                style={{
+                                  width: 17, height: 17, borderRadius: 4, flexShrink: 0, marginTop: 2,
+                                  background: isDone ? "#4ade80" : "transparent",
+                                  border: `1.5px solid ${isDone ? "#4ade80" : "#334155"}`,
+                                  cursor: "pointer", display: "flex", alignItems: "center",
+                                  justifyContent: "center", transition: "all 0.15s", padding: 0,
+                                }}
+                              >
+                                {isDone && (
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                    <path d="M1.5 5L3.8 7.5L8.5 2.5" stroke="#09090e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </button>
+                              <span style={{
+                                fontSize: 13, color: isDone ? "#475569" : "#e2e8f0",
+                                fontFamily: "'DM Sans',sans-serif", lineHeight: 1.55,
+                                textDecoration: isDone ? "line-through" : "none",
+                                transition: "color 0.15s",
+                              }}>
+                                {todo}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main TodosPage ─────────────────────────────────────────────────────────────
 export default function TodosPage({ currentUser }) {
+  const [activeTab, setActiveTab] = useState("notes");
   const [blocks, setBlocks] = useState([newBlock()]);
   const [title, setTitle] = useState("");
   const [titleEmpty, setTitleEmpty] = useState(true);
@@ -689,105 +1199,143 @@ export default function TodosPage({ currentUser }) {
     );
   }
 
+  const tabs = [
+    { id: "notes", label: "Notes" },
+    { id: "meetings", label: "Meeting Todos" },
+  ];
+
   return (
-    <div style={{ flex: 1, overflowY: "auto", background: "var(--bg)", position: "relative" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "52px 80px 240px" }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", position: "relative", overflow: "hidden" }}>
 
-        {/* Page title */}
-        <div style={{ position: "relative", marginBottom: 36 }}>
-          <div
-            ref={titleDivRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={e => {
-              const t = e.currentTarget.innerText;
-              setTitle(t); setTitleEmpty(!t.trim());
-              scheduleSave(currentBlocks.current, t);
-            }}
-            onKeyDown={e => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                if (blocks.length > 0) focusBlock(blocks[0].id, false);
-              }
-            }}
+      {/* Tab bar */}
+      <div style={{ borderBottom: "1px solid #1e3a5f", padding: "0 80px", display: "flex", gap: 0, flexShrink: 0 }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             style={{
-              fontSize: 38, fontWeight: 800, color: "var(--text)",
-              fontFamily: "'DM Sans',sans-serif", outline: "none",
-              lineHeight: 1.2, wordBreak: "break-word", minHeight: 46,
+              background: "transparent", border: "none",
+              borderBottom: `2px solid ${activeTab === tab.id ? "#6366f1" : "transparent"}`,
+              padding: "11px 16px", marginBottom: -1,
+              color: activeTab === tab.id ? "#a5b4fc" : "#64748b",
+              fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+              cursor: "pointer", transition: "color 0.15s",
             }}
-          />
-          {titleEmpty && (
-            <div style={{
-              position: "absolute", top: 0, left: 0, pointerEvents: "none", userSelect: "none",
-              fontSize: 38, fontWeight: 800, color: "#1e3a5f",
-              fontFamily: "'DM Sans',sans-serif", lineHeight: 1.2,
-            }}>
-              Untitled
-            </div>
-          )}
-        </div>
-
-        {/* Blocks */}
-        <div style={{ paddingLeft: 36 }}>
-          {blocks.map((block, i) => (
-            <BlockRow
-              key={block.id}
-              block={block}
-              blocks={blocks}
-              blockIdx={i}
-              onContentChange={handleContentChange}
-              onTypeChange={handleTypeChange}
-              onToggleCheck={handleToggleCheck}
-              onEnter={handleEnter}
-              onDeleteBlock={handleDeleteBlock}
-              onFocusPrev={handleFocusPrev}
-              onFocusNext={handleFocusNext}
-              onSlashOpen={(blockId, filter, pos) => setSlashState({ blockId, filter, pos })}
-              onSlashClose={() => setSlashState(null)}
-              isSlashActive={slashState?.blockId === block.id}
-              registerRef={registerRef}
-            />
-          ))}
-        </div>
-
-        {/* Click empty space below to append a block */}
-        <div
-          style={{ height: 200, paddingLeft: 36, cursor: "text" }}
-          onClick={() => {
-            const last = blocks[blocks.length - 1];
-            if (!last) return;
-            const el = blockRefs.current[last.id];
-            if (el) {
-              const txt = el.innerText?.trim();
-              if (!txt) setCursorEnd(el);
-              else handleEnter(last.id);
-            }
-          }}
-        />
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Slash menu */}
-      {slashState && (
-        <SlashMenu
-          filter={slashState.filter}
-          pos={slashState.pos}
-          onSelect={type => handleTypeChange(slashState.blockId, type)}
-          onClose={() => setSlashState(null)}
-        />
+      {/* Notes tab */}
+      {activeTab === "notes" && (
+        <div style={{ flex: 1, overflowY: "auto", position: "relative" }}>
+          <div style={{ maxWidth: 720, margin: "0 auto", padding: "52px 80px 240px" }}>
+
+            {/* Page title */}
+            <div style={{ position: "relative", marginBottom: 36 }}>
+              <div
+                ref={titleDivRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={e => {
+                  const t = e.currentTarget.innerText;
+                  setTitle(t); setTitleEmpty(!t.trim());
+                  scheduleSave(currentBlocks.current, t);
+                }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (blocks.length > 0) focusBlock(blocks[0].id, false);
+                  }
+                }}
+                style={{
+                  fontSize: 38, fontWeight: 800, color: "var(--text)",
+                  fontFamily: "'DM Sans',sans-serif", outline: "none",
+                  lineHeight: 1.2, wordBreak: "break-word", minHeight: 46,
+                }}
+              />
+              {titleEmpty && (
+                <div style={{
+                  position: "absolute", top: 0, left: 0, pointerEvents: "none", userSelect: "none",
+                  fontSize: 38, fontWeight: 800, color: "#1e3a5f",
+                  fontFamily: "'DM Sans',sans-serif", lineHeight: 1.2,
+                }}>
+                  Untitled
+                </div>
+              )}
+            </div>
+
+            {/* Blocks */}
+            <div style={{ paddingLeft: 36 }}>
+              {blocks.map((block, i) => (
+                <BlockRow
+                  key={block.id}
+                  block={block}
+                  blocks={blocks}
+                  blockIdx={i}
+                  onContentChange={handleContentChange}
+                  onTypeChange={handleTypeChange}
+                  onToggleCheck={handleToggleCheck}
+                  onEnter={handleEnter}
+                  onDeleteBlock={handleDeleteBlock}
+                  onFocusPrev={handleFocusPrev}
+                  onFocusNext={handleFocusNext}
+                  onSlashOpen={(blockId, filter, pos) => setSlashState({ blockId, filter, pos })}
+                  onSlashClose={() => setSlashState(null)}
+                  isSlashActive={slashState?.blockId === block.id}
+                  registerRef={registerRef}
+                />
+              ))}
+            </div>
+
+            {/* Click empty space below to append a block */}
+            <div
+              style={{ height: 200, paddingLeft: 36, cursor: "text" }}
+              onClick={() => {
+                const last = blocks[blocks.length - 1];
+                if (!last) return;
+                const el = blockRefs.current[last.id];
+                if (el) {
+                  const txt = el.innerText?.trim();
+                  if (!txt) setCursorEnd(el);
+                  else handleEnter(last.id);
+                }
+              }}
+            />
+          </div>
+
+          {/* Slash menu */}
+          {slashState && (
+            <SlashMenu
+              filter={slashState.filter}
+              pos={slashState.pos}
+              onSelect={type => handleTypeChange(slashState.blockId, type)}
+              onClose={() => setSlashState(null)}
+            />
+          )}
+
+          {/* Inline format toolbar */}
+          {formatBar && <FormatBar x={formatBar.x} y={formatBar.y} />}
+        </div>
       )}
 
-      {/* Inline format toolbar */}
-      {formatBar && <FormatBar x={formatBar.x} y={formatBar.y} />}
+      {/* Meeting Todos tab */}
+      {activeTab === "meetings" && (
+        <MeetingTodosPanel currentUser={currentUser} />
+      )}
 
-      {/* Save status */}
-      <div style={{
-        position: "fixed", bottom: 16, right: 20,
-        fontSize: 10, fontFamily: "'DM Mono',monospace",
-        color: saving ? "#64748b" : "#1e3a5f",
-        transition: "color 0.5s", userSelect: "none", pointerEvents: "none",
-      }}>
-        {saving ? "Saving…" : "All saved"}
-      </div>
+      {/* Save status (notes tab only) */}
+      {activeTab === "notes" && (
+        <div style={{
+          position: "fixed", bottom: 16, right: 20,
+          fontSize: 10, fontFamily: "'DM Mono',monospace",
+          color: saving ? "#64748b" : "#1e3a5f",
+          transition: "color 0.5s", userSelect: "none", pointerEvents: "none",
+        }}>
+          {saving ? "Saving…" : "All saved"}
+        </div>
+      )}
     </div>
   );
 }

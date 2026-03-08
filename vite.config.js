@@ -13,6 +13,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/hubspot-api/, ''),
       },
+      '/api/fireflies': {
+        target: 'https://api.fireflies.ai',
+        changeOrigin: true,
+        rewrite: () => '/graphql',
+      },
     },
   },
 })
