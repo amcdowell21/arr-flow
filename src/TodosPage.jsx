@@ -962,8 +962,22 @@ function MeetingTodosPanel({ currentUser }) {
                               </svg>
                             )}
                           </button>
-                          <span style={{ fontSize: 11, color: "#64748b", fontFamily: "'DM Sans',sans-serif", flex: 1 }}>
+                          <span style={{ fontSize: 11, color: "#64748b", fontFamily: "'DM Sans',sans-serif", flex: 1, display: "flex", alignItems: "center", gap: 5 }}>
                             {item.transcript.title}
+                            <a
+                              href={`https://app.fireflies.ai/view/${item.transcript.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="View Fireflies notes"
+                              style={{ color: "#475569", lineHeight: 1, flexShrink: 0 }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 6.667V10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h3.333" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M7.5 1H11v3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M5 7L11 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </a>
                           </span>
                           {dateStr && (
                             <span style={{ fontSize: 10, color: "#334155", fontFamily: "'DM Mono',monospace" }}>
@@ -1100,8 +1114,22 @@ function MeetingTodosPanel({ currentUser }) {
                                   <path d="M1.5 5L3.8 7.5L8.5 2.5" stroke="#09090e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                               </button>
-                              <span style={{ fontSize: 11, color: "#475569", fontFamily: "'DM Sans',sans-serif", flex: 1, textDecoration: "line-through" }}>
+                              <span style={{ fontSize: 11, color: "#475569", fontFamily: "'DM Sans',sans-serif", flex: 1, textDecoration: "line-through", display: "flex", alignItems: "center", gap: 5 }}>
                                 {item.transcript.title}
+                                <a
+                                  href={`https://app.fireflies.ai/view/${item.transcript.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="View Fireflies notes"
+                                  style={{ color: "#475569", lineHeight: 1, flexShrink: 0, textDecoration: "none" }}
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 6.667V10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h3.333" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M7.5 1H11v3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M5 7L11 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </a>
                               </span>
                               {dateStr && (
                                 <span style={{ fontSize: 10, color: "#334155", fontFamily: "'DM Mono',monospace" }}>
