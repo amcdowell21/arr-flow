@@ -1244,7 +1244,7 @@ export default function TodosPage({ currentUser }) {
           blocks: currentBlocks.current,
           title: currentTitle.current,
           updatedAt: Date.now(),
-        }).catch(() => {});
+        }, { merge: true }).catch(() => {});
       }
     };
   }, []);
@@ -1254,7 +1254,7 @@ export default function TodosPage({ currentUser }) {
     clearTimeout(saveTimerRef.current);
     setSaving(true);
     saveTimerRef.current = setTimeout(async () => {
-      await setDoc(docRef.current, { blocks: newBlocks, title: newTitle, updatedAt: Date.now() });
+      await setDoc(docRef.current, { blocks: newBlocks, title: newTitle, updatedAt: Date.now() }, { merge: true });
       setSaving(false);
     }, 1500);
   }

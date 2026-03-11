@@ -7,7 +7,7 @@ import {
   serverTimestamp, query, orderBy, updateDoc,
 } from "firebase/firestore";
 import PipelineDashboards from "./PipelineDashboards";
-import { fetchDealContacts, fetchDealNotes, updateDealStage } from "./hubspot";
+import { fetchDealContacts, fetchDealNotes, updateDealStage, updateDealAmount } from "./hubspot";
 
 // ─── CSV seed data ────────────────────────────────────────────────────────────
 const CSV_SEED_DATA = [
@@ -164,9 +164,7 @@ const US_STATES = [
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function formatCurrency(n) {
   if (!n || isNaN(n)) return "$0";
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
-  return `$${Math.round(n)}`;
+  return "$" + Math.round(n).toLocaleString("en-US");
 }
 
 function computeAlgoConfidence(deal) {
@@ -1518,6 +1516,12 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
       updateDealStage(hsToken, rest.hubspotId, "closedwon")
         .then(() => onHsDealClosed?.(rest.hubspotId))
         .catch(e => console.error("HubSpot close sync failed:", e));
+    }
+
+    // Pipeline Tracker → HubSpot: push amount when value changes
+    if (rest.hubspotId && hsToken && rest.value != null && rest.value !== prevDeal?.value) {
+      updateDealAmount(hsToken, rest.hubspotId, rest.value)
+        .catch(e => console.error("HubSpot amount sync failed:", e));
     }
 
     // Sync event dealsWon / dealValue based on closedWon state changes

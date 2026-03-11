@@ -105,6 +105,18 @@ export async function updateDealStage(token, dealId, stageId) {
   });
 }
 
+/**
+ * Update the amount (value) of a single deal.
+ * @param {string} token   HubSpot Private App token
+ * @param {string} dealId  HubSpot deal ID
+ * @param {number} amount  new deal amount
+ */
+export async function updateDealAmount(token, dealId, amount) {
+  return hsPatch(token, `/crm/v3/objects/deals/${dealId}`, {
+    properties: { amount: String(amount) },
+  });
+}
+
 async function hsPost(token, path, body) {
   let url;
   if (import.meta.env.DEV) {
