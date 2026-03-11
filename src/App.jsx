@@ -636,6 +636,18 @@ function HomePage({ onNavigate }) {
         </svg>
       ),
     },
+    {
+      id: "todos",
+      title: "Notes & Todos",
+      desc: "Private notes, meeting action items from Fireflies, and todos linked to deals.",
+      color: "#f59e0b",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect x="5" y="4" width="22" height="24" rx="3" stroke="#f59e0b" strokeWidth="2.2"/>
+          <path d="M10 11h12M10 16h12M10 21h7" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -650,7 +662,7 @@ function HomePage({ onNavigate }) {
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 860 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 250px)", gap: 20, justifyContent: "center" }}>
         {tiles.map(tile => (
           <button
             key={tile.id}
