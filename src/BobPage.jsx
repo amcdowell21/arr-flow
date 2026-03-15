@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { db } from "./firebase";
-import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 // ─── Lightweight markdown renderer ──────────────────────────────────────────
 function renderMarkdown(text) {
@@ -279,12 +279,38 @@ export default function BobPage({ currentUser, hsToken }) {
     setActiveTools([]);
     streamingTextRef.current = "";
 
+    // Create or update conversation in Firestore from the client BEFORE calling the API
+    let convId = activeConvIdRef.current;
+    try {
+      const msgData = newMessages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
+      if (!convId) {
+        const title = text.slice(0, 60);
+        const newDoc = await addDoc(collection(db, "bobConversations"), {
+          userId: currentUser.uid,
+          title,
+          messages: msgData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        convId = newDoc.id;
+        setActiveConvId(convId);
+        activeConvIdRef.current = convId;
+      } else {
+        await updateDoc(doc(db, "bobConversations", convId), {
+          messages: msgData,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      console.error("Conversation save error:", e);
+    }
+
     try {
       const response = await fetch("/api/bob", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          conversationId: activeConvId,
+          conversationId: convId,
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           userId: currentUser.uid,
           hsToken: hsToken || localStorage.getItem("hs_token") || null,
@@ -312,20 +338,11 @@ export default function BobPage({ currentUser, hsToken }) {
             });
             break;
           case "conversation":
-            setActiveConvId(data.id);
-            activeConvIdRef.current = data.id;
-            // Immediately add to sidebar so the conversation is visible
-            setConversations(prev => {
-              if (prev.find(c => c.id === data.id)) return prev;
-              return [{
-                id: data.id,
-                title: data.title || "New conversation",
-                messages: newMessages,
-                userId: currentUser.uid,
-                updatedAt: { seconds: Date.now() / 1000 },
-                createdAt: { seconds: Date.now() / 1000 },
-              }, ...prev];
-            });
+            // Backend may send this — update ref if different
+            if (data.id && data.id !== activeConvIdRef.current) {
+              setActiveConvId(data.id);
+              activeConvIdRef.current = data.id;
+            }
             break;
           case "error":
             streamingTextRef.current += `\n\n*Error: ${data.message}*`;
@@ -341,14 +358,18 @@ export default function BobPage({ currentUser, hsToken }) {
       const finalMessages = [...newMessages, assistantMsg];
       setMessages(finalMessages);
       setStreamingText("");
-      // Update the conversation in the sidebar with full messages
-      const convId = activeConvIdRef.current;
-      if (convId) {
-        setConversations(prev => prev.map(c =>
-          c.id === convId
-            ? { ...c, messages: finalMessages, updatedAt: { seconds: Date.now() / 1000 } }
-            : c
-        ));
+
+      // Save final messages (with assistant response) to Firestore
+      const finalConvId = activeConvIdRef.current;
+      if (finalConvId) {
+        try {
+          await updateDoc(doc(db, "bobConversations", finalConvId), {
+            messages: finalMessages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() })),
+            updatedAt: serverTimestamp(),
+          });
+        } catch (e) {
+          console.error("Conversation update error:", e);
+        }
       }
     } catch (e) {
       setMessages(prev => [...prev, { role: "assistant", content: `Sorry, something went wrong: ${e.message}`, timestamp: Date.now() }]);
