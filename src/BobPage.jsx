@@ -214,12 +214,24 @@ export default function BobPage({ currentUser, hsToken }) {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [inCall, setInCall] = useState(false);
+  const [callPhase, setCallPhase] = useState("idle"); // idle | listening | processing | speaking
+  const [callSeconds, setCallSeconds] = useState(0);
+  const [callTranscript, setCallTranscript] = useState([]);
+  const [callLiveText, setCallLiveText] = useState("");
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const streamingTextRef = useRef("");
   const activeConvIdRef = useRef(null);
   const recognitionRef = useRef(null);
   const audioRef = useRef(null);
+  const callRecRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+  const callActiveRef = useRef(false);
+  const callTimerRef = useRef(null);
+  const callTranscriptRef = useRef([]);
+  const callMessagesRef = useRef([]);  // full messages for API context
+  const callTranscriptEndRef = useRef(null);
 
   // ─── Speech Recognition setup ───────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -344,6 +356,288 @@ export default function BobPage({ currentUser, hsToken }) {
     }
     setSpeaking(false);
   }, []);
+
+  // ─── Call mode: TTS that returns a promise ─────────────────────────────
+  const playCallTTS = useCallback(async (text) => {
+    if (!text.trim()) return;
+
+    const cleanText = text
+      .replace(/```[\s\S]*?```/g, " code block omitted ")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/`(.+?)`/g, "$1")
+      .replace(/^#{1,3}\s/gm, "")
+      .replace(/^[-*]\s/gm, "")
+      .replace(/^\d+\.\s/gm, "")
+      .replace(/---+/g, "")
+      .replace(/\n{2,}/g, ". ")
+      .replace(/\n/g, " ")
+      .trim();
+
+    if (!cleanText) return;
+    const truncated = cleanText.length > 1500 ? cleanText.slice(0, 1500) + "..." : cleanText;
+
+    setCallPhase("speaking");
+    setSpeaking(true);
+
+    return new Promise(async (resolve) => {
+      try {
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: truncated }),
+        });
+
+        if (!res.ok) {
+          console.error("TTS error:", res.status);
+          setSpeaking(false);
+          resolve();
+          return;
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          setSpeaking(false);
+          URL.revokeObjectURL(url);
+          audioRef.current = null;
+          resolve();
+        };
+
+        audio.onerror = () => {
+          setSpeaking(false);
+          URL.revokeObjectURL(url);
+          audioRef.current = null;
+          resolve();
+        };
+
+        await audio.play();
+      } catch (e) {
+        console.error("TTS error:", e);
+        setSpeaking(false);
+        resolve();
+      }
+    });
+  }, []);
+
+  // ─── Call mode: send message and get response ─────────────────────────
+  const sendCallMessage = useCallback(async (text) => {
+    if (!text.trim() || !callActiveRef.current) return;
+
+    const userMsg = { role: "user", content: text };
+    callMessagesRef.current = [...callMessagesRef.current, userMsg];
+    callTranscriptRef.current = [...callTranscriptRef.current, { role: "user", content: text, timestamp: Date.now() }];
+    setCallTranscript([...callTranscriptRef.current]);
+    setCallPhase("processing");
+
+    // Create/update Firestore conversation
+    let convId = activeConvIdRef.current;
+    const msgData = callMessagesRef.current.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
+    if (!convId) {
+      const title = "Voice Call — " + text.slice(0, 40);
+      try {
+        const newDoc = await addDoc(collection(db, "bobConversations"), {
+          userId: currentUser.uid, title, messages: msgData,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        });
+        convId = newDoc.id;
+        setActiveConvId(convId);
+        activeConvIdRef.current = convId;
+        setConversations(prev => {
+          if (prev.some(c => c.id === convId)) return prev;
+          return [{ id: convId, title, messages: msgData, userId: currentUser.uid,
+            updatedAt: { seconds: Date.now() / 1000 }, createdAt: { seconds: Date.now() / 1000 } }, ...prev];
+        });
+      } catch (e) { console.error("Conv create error:", e); }
+    } else {
+      try {
+        await updateDoc(doc(db, "bobConversations", convId), { messages: msgData, updatedAt: serverTimestamp() });
+      } catch (e) { console.error("Conv update error:", e); }
+    }
+
+    try {
+      const response = await fetch("/api/bob", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: convId,
+          messages: callMessagesRef.current.map(m => ({ role: m.role, content: m.content })),
+          userId: currentUser.uid,
+          hsToken: hsToken || localStorage.getItem("hs_token") || null,
+        }),
+      });
+
+      if (!response.ok) throw new Error(`Server error (${response.status})`);
+
+      let responseText = "";
+      for await (const { event, data } of parseSSE(response)) {
+        if (!callActiveRef.current) break;
+        if (event === "delta") responseText += data.text;
+        if (event === "error") responseText += ` Error: ${data.message}`;
+      }
+
+      if (!callActiveRef.current) return;
+
+      const assistantMsg = { role: "assistant", content: responseText };
+      callMessagesRef.current = [...callMessagesRef.current, assistantMsg];
+      callTranscriptRef.current = [...callTranscriptRef.current, { role: "assistant", content: responseText, timestamp: Date.now() }];
+      setCallTranscript([...callTranscriptRef.current]);
+
+      // Also update messages state so chat history persists
+      setMessages([...callMessagesRef.current]);
+
+      // Save to Firestore
+      const finalConvId = activeConvIdRef.current;
+      if (finalConvId && !finalConvId.startsWith("local_")) {
+        const finalMsgData = callMessagesRef.current.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
+        try {
+          await updateDoc(doc(db, "bobConversations", finalConvId), { messages: finalMsgData, updatedAt: serverTimestamp() });
+        } catch (e) { console.error("Conv save error:", e); }
+      }
+
+      // Play TTS, then resume listening
+      await playCallTTS(responseText);
+
+      if (callActiveRef.current) {
+        startCallListening();
+      }
+    } catch (e) {
+      console.error("Call send error:", e);
+      if (callActiveRef.current) startCallListening();
+    }
+  }, [currentUser, hsToken, playCallTTS]);
+
+  // ─── Call mode: start listening with silence detection ────────────────
+  const startCallListening = useCallback(() => {
+    if (!callActiveRef.current) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (callRecRef.current) callRecRef.current.abort();
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    callRecRef.current = recognition;
+
+    let finalTranscript = "";
+    let hasSpoken = false;
+
+    setCallPhase("listening");
+    setCallLiveText("");
+
+    recognition.onresult = (event) => {
+      if (!callActiveRef.current) return;
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+          hasSpoken = true;
+        } else {
+          interim += event.results[i][0].transcript;
+          hasSpoken = true;
+        }
+      }
+      setCallLiveText(finalTranscript + interim);
+
+      // Reset silence timer — send after 1.5s of silence
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (hasSpoken) {
+        silenceTimerRef.current = setTimeout(() => {
+          if (!callActiveRef.current) return;
+          const textToSend = finalTranscript.trim();
+          if (textToSend) {
+            recognition.stop();
+            callRecRef.current = null;
+            setCallLiveText("");
+            sendCallMessage(textToSend);
+          }
+        }, 1500);
+      }
+    };
+
+    recognition.onend = () => {
+      // If call is still active and we didn't intentionally stop, restart
+      if (callActiveRef.current && !silenceTimerRef.current) {
+        try { recognition.start(); } catch (e) { /* ignore */ }
+      }
+    };
+
+    recognition.onerror = (e) => {
+      if (e.error === "no-speech" && callActiveRef.current) {
+        // Restart on no-speech
+        try { recognition.start(); } catch (err) { /* ignore */ }
+      }
+    };
+
+    recognition.start();
+  }, [sendCallMessage]);
+
+  // ─── Start call ───────────────────────────────────────────────────────
+  const startCall = useCallback(() => {
+    callActiveRef.current = true;
+    callMessagesRef.current = [...messages];
+    callTranscriptRef.current = messages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
+    setCallTranscript([...callTranscriptRef.current]);
+    setInCall(true);
+    setCallSeconds(0);
+    setCallPhase("listening");
+    setCallLiveText("");
+
+    // Start call timer
+    callTimerRef.current = setInterval(() => {
+      setCallSeconds(s => s + 1);
+    }, 1000);
+
+    // Start listening
+    startCallListening();
+  }, [messages, startCallListening]);
+
+  // ─── End call ─────────────────────────────────────────────────────────
+  const endCall = useCallback(() => {
+    callActiveRef.current = false;
+
+    if (callRecRef.current) {
+      callRecRef.current.abort();
+      callRecRef.current = null;
+    }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setSpeaking(false);
+    setInCall(false);
+    setCallPhase("idle");
+    setCallLiveText("");
+    setCallSeconds(0);
+
+    // Sync call messages back to chat
+    if (callMessagesRef.current.length > 0) {
+      setMessages([...callMessagesRef.current]);
+    }
+  }, []);
+
+  // Auto-scroll call transcript
+  useEffect(() => {
+    if (inCall) {
+      callTranscriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [callTranscript, callLiveText, inCall]);
 
   // Load conversations list
   useEffect(() => {
@@ -611,6 +905,7 @@ export default function BobPage({ currentUser, hsToken }) {
         @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
         @keyframes voiceBar { from{height:4px} to{height:14px} }
         @keyframes micPulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)} 50%{box-shadow:0 0 0 8px rgba(239,68,68,0)} }
+        @keyframes callRing { 0%{transform:translate(-50%,-50%) scale(0.8);opacity:0.6} 100%{transform:translate(-50%,-50%) scale(1.3);opacity:0} }
         .conv-row:hover .conv-action-btn { opacity: 0.6 !important; }
         .conv-action-btn:hover { opacity: 1 !important; }
       `}</style>
@@ -765,6 +1060,28 @@ export default function BobPage({ currentUser, hsToken }) {
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Bob</div>
             <div style={{ fontSize: 10, color: "#64748b", fontFamily: "'DM Mono',monospace" }}>Revenue Operations Agent</div>
           </div>
+
+          {/* Call button */}
+          {(window.SpeechRecognition || window.webkitSpeechRecognition) && (
+            <button
+              onClick={startCall}
+              title="Start voice call with Bob"
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "5px 12px", borderRadius: 8,
+                background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)",
+                color: "#4ade80", fontSize: 11, fontFamily: "'DM Mono',monospace",
+                cursor: "pointer", transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(74,222,128,0.18)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(74,222,128,0.1)"; }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+              </svg>
+              Call
+            </button>
+          )}
 
           {/* Voice mode toggle */}
           <button
@@ -1007,6 +1324,208 @@ export default function BobPage({ currentUser, hsToken }) {
           </div>
         </div>
       </div>
+
+      {/* ─── Call Mode Overlay ──────────────────────────────────────────── */}
+      {inCall && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "#09090e", display: "flex",
+          fontFamily: "'DM Sans',sans-serif",
+        }}>
+          {/* Left panel — call visual */}
+          <div style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            position: "relative",
+          }}>
+            {/* Call timer */}
+            <div style={{
+              position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)",
+              fontSize: 13, color: "#64748b", fontFamily: "'DM Mono',monospace",
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", animation: "pulse 2s infinite" }} />
+              {Math.floor(callSeconds / 60).toString().padStart(2, "0")}:{(callSeconds % 60).toString().padStart(2, "0")}
+            </div>
+
+            {/* Bob avatar with rings */}
+            <div style={{ position: "relative", marginBottom: 32 }}>
+              {callPhase === "speaking" && [80, 100, 120].map((size, i) => (
+                <div key={i} style={{
+                  position: "absolute",
+                  width: size, height: size,
+                  borderRadius: "50%",
+                  border: "1px solid rgba(6,182,212,0.15)",
+                  top: "50%", left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  animation: `callRing 2s ease-out ${i * 0.4}s infinite`,
+                }} />
+              ))}
+              {callPhase === "listening" && [80, 100, 120].map((size, i) => (
+                <div key={i} style={{
+                  position: "absolute",
+                  width: size, height: size,
+                  borderRadius: "50%",
+                  border: "1px solid rgba(99,102,241,0.15)",
+                  top: "50%", left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  animation: `callRing 2.5s ease-out ${i * 0.5}s infinite`,
+                }} />
+              ))}
+              <div style={{
+                width: 64, height: 64, borderRadius: "50%",
+                background: "linear-gradient(135deg, #06b6d4 0%, #6366f1 100%)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 26, fontWeight: 700, color: "#fff",
+                position: "relative", zIndex: 1,
+              }}>B</div>
+            </div>
+
+            {/* Phase label */}
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#f1f5f9", marginBottom: 6 }}>Bob</div>
+            <div style={{
+              fontSize: 12, color:
+                callPhase === "listening" ? "#a78bfa" :
+                callPhase === "processing" ? "#67e8f9" :
+                callPhase === "speaking" ? "#4ade80" : "#64748b",
+              fontFamily: "'DM Mono',monospace",
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              {callPhase === "listening" && (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="1" width="6" height="12" rx="3" fill="currentColor" />
+                    <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                  </svg>
+                  Listening...
+                </>
+              )}
+              {callPhase === "processing" && (
+                <>
+                  <span style={{ display: "flex", gap: 3 }}>
+                    {[0, 1, 2].map(i => (
+                      <span key={i} style={{
+                        width: 4, height: 4, borderRadius: "50%", background: "#06b6d4",
+                        animation: `pulse 1.2s infinite ${i * 0.2}s`,
+                      }} />
+                    ))}
+                  </span>
+                  Thinking...
+                </>
+              )}
+              {callPhase === "speaking" && (
+                <>
+                  <span style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                    {[0, 1, 2, 3, 4].map(i => (
+                      <span key={i} style={{
+                        width: 2, borderRadius: 1, background: "#4ade80",
+                        animation: `voiceBar 0.6s ease-in-out ${i * 0.1}s infinite alternate`,
+                      }} />
+                    ))}
+                  </span>
+                  Speaking...
+                </>
+              )}
+            </div>
+
+            {/* Live speech preview */}
+            {callLiveText && callPhase === "listening" && (
+              <div style={{
+                marginTop: 24, padding: "10px 20px", borderRadius: 12,
+                background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+                maxWidth: 400, fontSize: 13, color: "#c4b5fd", lineHeight: 1.6,
+                textAlign: "center", fontStyle: "italic",
+              }}>
+                {callLiveText}
+              </div>
+            )}
+
+            {/* Hang up button */}
+            <button
+              onClick={endCall}
+              style={{
+                position: "absolute", bottom: 40,
+                width: 56, height: 56, borderRadius: "50%",
+                background: "#ef4444", border: "none",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s",
+                boxShadow: "0 0 20px rgba(239,68,68,0.3)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#dc2626"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#ef4444"; }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" transform="rotate(135 12 12)"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Right panel — transcript */}
+          <div style={{
+            width: 360, borderLeft: "1px solid #1e293b",
+            display: "flex", flexDirection: "column",
+            background: "#0f172a",
+          }}>
+            <div style={{
+              padding: "16px 20px", borderBottom: "1px solid #1e293b",
+              fontSize: 12, fontWeight: 600, color: "#94a3b8",
+              fontFamily: "'DM Mono',monospace",
+            }}>
+              Transcript
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+              {callTranscript.map((entry, i) => (
+                <div key={i} style={{
+                  marginBottom: 16, animation: "fadeUp 0.2s ease",
+                }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 600, marginBottom: 4,
+                    color: entry.role === "user" ? "#a78bfa" : "#67e8f9",
+                    fontFamily: "'DM Mono',monospace",
+                    textTransform: "uppercase",
+                  }}>
+                    {entry.role === "user" ? "You" : "Bob"}
+                  </div>
+                  <div style={{
+                    fontSize: 12, color: "#e2e8f0", lineHeight: 1.65,
+                    padding: "8px 12px", borderRadius: 8,
+                    background: entry.role === "user" ? "rgba(99,102,241,0.08)" : "rgba(6,182,212,0.06)",
+                    border: `1px solid ${entry.role === "user" ? "rgba(99,102,241,0.15)" : "rgba(6,182,212,0.12)"}`,
+                  }}>
+                    {entry.role === "assistant" ? renderMarkdown(entry.content) : entry.content}
+                  </div>
+                </div>
+              ))}
+
+              {/* Live listening preview in transcript */}
+              {callLiveText && callPhase === "listening" && (
+                <div style={{ marginBottom: 16, animation: "fadeUp 0.2s ease" }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 600, marginBottom: 4,
+                    color: "#a78bfa", fontFamily: "'DM Mono',monospace",
+                    textTransform: "uppercase",
+                  }}>You</div>
+                  <div style={{
+                    fontSize: 12, color: "#c4b5fd", lineHeight: 1.65,
+                    padding: "8px 12px", borderRadius: 8,
+                    background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.15)",
+                    fontStyle: "italic",
+                  }}>
+                    {callLiveText}
+                    <span style={{
+                      display: "inline-block", width: 4, height: 12,
+                      background: "#a78bfa", borderRadius: 1, marginLeft: 2,
+                      animation: "pulse 0.8s infinite", verticalAlign: "middle",
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              <div ref={callTranscriptEndRef} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
