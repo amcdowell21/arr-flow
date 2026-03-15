@@ -234,8 +234,7 @@ export default function BobPage({ currentUser, hsToken }) {
   const callTranscriptEndRef = useRef(null);
   const sendCallMessageRef = useRef(null);
   const startCallListeningRef = useRef(null);
-  const micStreamRef = useRef(null);
-  const analyserRef = useRef(null);
+  const micLevelDecayRef = useRef(null);
   const [micLevel, setMicLevel] = useState(0);
 
   // ─── Speech Recognition setup ───────────────────────────────────────────
@@ -429,43 +428,14 @@ export default function BobPage({ currentUser, hsToken }) {
   }, []);
 
   // ─── Call mode: mic level monitor ─────────────────────────────────────
-  const startMicMonitor = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStreamRef.current = stream;
-      const audioCtx = new AudioContext();
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const tick = () => {
-        if (!callActiveRef.current) {
-          audioCtx.close();
-          return;
-        }
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const avg = sum / dataArray.length;
-        setMicLevel(Math.min(avg / 80, 1)); // normalize to 0-1
-        requestAnimationFrame(tick);
-      };
-      tick();
-    } catch (e) {
-      console.error("Mic monitor error:", e);
-    }
+  // NOTE: We do NOT call getUserMedia here — it conflicts with SpeechRecognition
+  // on many browsers, causing recognition to immediately die. Instead we drive
+  // the mic level visualizer from speech recognition activity (see onresult).
+  const startMicMonitor = useCallback(() => {
+    // No-op — mic level is now driven by speech recognition events
   }, []);
 
   const stopMicMonitor = useCallback(() => {
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
-    }
-    analyserRef.current = null;
     setMicLevel(0);
   }, []);
 
@@ -619,6 +589,11 @@ export default function BobPage({ currentUser, hsToken }) {
       const liveText = finalTranscript + interim;
       console.log("[Bob Call] Speech:", liveText.slice(0, 60));
       setCallLiveText(liveText);
+
+      // Drive mic level visualizer from speech activity
+      setMicLevel(0.6 + Math.random() * 0.4);
+      if (micLevelDecayRef.current) clearTimeout(micLevelDecayRef.current);
+      micLevelDecayRef.current = setTimeout(() => setMicLevel(0), 300);
 
       // Reset silence timer — send after 1.5s of silence
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
