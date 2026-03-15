@@ -214,6 +214,7 @@ export default function BobPage({ currentUser, hsToken }) {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const streamingTextRef = useRef("");
+  const activeConvIdRef = useRef(null);
 
   // Load conversations list
   useEffect(() => {
@@ -226,6 +227,8 @@ export default function BobPage({ currentUser, hsToken }) {
       const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       convs.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
       setConversations(convs);
+    }, err => {
+      console.error("bobConversations onSnapshot error:", err);
     });
     return unsub;
   }, [currentUser]);
@@ -238,6 +241,7 @@ export default function BobPage({ currentUser, hsToken }) {
   // Load conversation messages when switching
   const loadConversation = useCallback((conv) => {
     setActiveConvId(conv.id);
+    activeConvIdRef.current = conv.id;
     setMessages(conv.messages || []);
     setStreamingText("");
     setActiveTools([]);
@@ -246,6 +250,7 @@ export default function BobPage({ currentUser, hsToken }) {
   // Start new chat
   const newChat = useCallback(() => {
     setActiveConvId(null);
+    activeConvIdRef.current = null;
     setMessages([]);
     setStreamingText("");
     setActiveTools([]);
@@ -308,6 +313,19 @@ export default function BobPage({ currentUser, hsToken }) {
             break;
           case "conversation":
             setActiveConvId(data.id);
+            activeConvIdRef.current = data.id;
+            // Immediately add to sidebar so the conversation is visible
+            setConversations(prev => {
+              if (prev.find(c => c.id === data.id)) return prev;
+              return [{
+                id: data.id,
+                title: data.title || "New conversation",
+                messages: newMessages,
+                userId: currentUser.uid,
+                updatedAt: { seconds: Date.now() / 1000 },
+                createdAt: { seconds: Date.now() / 1000 },
+              }, ...prev];
+            });
             break;
           case "error":
             streamingTextRef.current += `\n\n*Error: ${data.message}*`;
@@ -320,8 +338,18 @@ export default function BobPage({ currentUser, hsToken }) {
 
       // Finalize assistant message
       const assistantMsg = { role: "assistant", content: streamingTextRef.current, timestamp: Date.now() };
-      setMessages(prev => [...prev, assistantMsg]);
+      const finalMessages = [...newMessages, assistantMsg];
+      setMessages(finalMessages);
       setStreamingText("");
+      // Update the conversation in the sidebar with full messages
+      const convId = activeConvIdRef.current;
+      if (convId) {
+        setConversations(prev => prev.map(c =>
+          c.id === convId
+            ? { ...c, messages: finalMessages, updatedAt: { seconds: Date.now() / 1000 } }
+            : c
+        ));
+      }
     } catch (e) {
       setMessages(prev => [...prev, { role: "assistant", content: `Sorry, something went wrong: ${e.message}`, timestamp: Date.now() }]);
       setStreamingText("");
