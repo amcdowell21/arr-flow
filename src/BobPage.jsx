@@ -232,6 +232,11 @@ export default function BobPage({ currentUser, hsToken }) {
   const callTranscriptRef = useRef([]);
   const callMessagesRef = useRef([]);  // full messages for API context
   const callTranscriptEndRef = useRef(null);
+  const sendCallMessageRef = useRef(null);
+  const startCallListeningRef = useRef(null);
+  const micStreamRef = useRef(null);
+  const analyserRef = useRef(null);
+  const [micLevel, setMicLevel] = useState(0);
 
   // ─── Speech Recognition setup ───────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -423,7 +428,49 @@ export default function BobPage({ currentUser, hsToken }) {
     });
   }, []);
 
+  // ─── Call mode: mic level monitor ─────────────────────────────────────
+  const startMicMonitor = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!callActiveRef.current) {
+          audioCtx.close();
+          return;
+        }
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / dataArray.length;
+        setMicLevel(Math.min(avg / 80, 1)); // normalize to 0-1
+        requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (e) {
+      console.error("Mic monitor error:", e);
+    }
+  }, []);
+
+  const stopMicMonitor = useCallback(() => {
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
+    analyserRef.current = null;
+    setMicLevel(0);
+  }, []);
+
   // ─── Call mode: send message and get response ─────────────────────────
+  // Using ref pattern to break circular dependency with startCallListening
   const sendCallMessage = useCallback(async (text) => {
     if (!text.trim() || !callActiveRef.current) return;
 
@@ -502,13 +549,16 @@ export default function BobPage({ currentUser, hsToken }) {
       await playCallTTS(responseText);
 
       if (callActiveRef.current) {
-        startCallListening();
+        startCallListeningRef.current();
       }
     } catch (e) {
       console.error("Call send error:", e);
-      if (callActiveRef.current) startCallListening();
+      if (callActiveRef.current) startCallListeningRef.current();
     }
   }, [currentUser, hsToken, playCallTTS]);
+
+  // Keep ref in sync
+  useEffect(() => { sendCallMessageRef.current = sendCallMessage; }, [sendCallMessage]);
 
   // ─── Call mode: start listening with silence detection ────────────────
   const startCallListening = useCallback(() => {
@@ -517,8 +567,13 @@ export default function BobPage({ currentUser, hsToken }) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
-    if (callRecRef.current) callRecRef.current.abort();
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (callRecRef.current) {
+      try { callRecRef.current.abort(); } catch (e) { /* ignore */ }
+    }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
 
     const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
@@ -550,34 +605,60 @@ export default function BobPage({ currentUser, hsToken }) {
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (hasSpoken) {
         silenceTimerRef.current = setTimeout(() => {
+          silenceTimerRef.current = null;
           if (!callActiveRef.current) return;
           const textToSend = finalTranscript.trim();
           if (textToSend) {
-            recognition.stop();
+            try { recognition.stop(); } catch (e) { /* ignore */ }
             callRecRef.current = null;
             setCallLiveText("");
-            sendCallMessage(textToSend);
+            // Use ref to always get latest sendCallMessage
+            sendCallMessageRef.current(textToSend);
           }
         }, 1500);
       }
     };
 
     recognition.onend = () => {
-      // If call is still active and we didn't intentionally stop, restart
-      if (callActiveRef.current && !silenceTimerRef.current) {
-        try { recognition.start(); } catch (e) { /* ignore */ }
+      // If call is still active and silence timer hasn't fired, restart
+      if (callActiveRef.current && callRecRef.current === recognition) {
+        setTimeout(() => {
+          if (callActiveRef.current && !silenceTimerRef.current) {
+            try { recognition.start(); } catch (e) { /* ignore */ }
+          }
+        }, 100);
       }
     };
 
     recognition.onerror = (e) => {
-      if (e.error === "no-speech" && callActiveRef.current) {
-        // Restart on no-speech
-        try { recognition.start(); } catch (err) { /* ignore */ }
+      if (callActiveRef.current && (e.error === "no-speech" || e.error === "aborted")) {
+        setTimeout(() => {
+          if (callActiveRef.current && !silenceTimerRef.current) {
+            try {
+              const r = new SpeechRecognition();
+              r.lang = "en-US";
+              r.interimResults = true;
+              r.continuous = true;
+              r.onresult = recognition.onresult;
+              r.onend = recognition.onend;
+              r.onerror = recognition.onerror;
+              callRecRef.current = r;
+              r.start();
+            } catch (err) { /* ignore */ }
+          }
+        }, 200);
       }
     };
 
-    recognition.start();
-  }, [sendCallMessage]);
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error("Recognition start error:", e);
+    }
+  }, []);
+
+  // Keep ref in sync
+  useEffect(() => { startCallListeningRef.current = startCallListening; }, [startCallListening]);
 
   // ─── Start call ───────────────────────────────────────────────────────
   const startCall = useCallback(() => {
@@ -595,16 +676,17 @@ export default function BobPage({ currentUser, hsToken }) {
       setCallSeconds(s => s + 1);
     }, 1000);
 
-    // Start listening
+    // Start mic monitor + listening
+    startMicMonitor();
     startCallListening();
-  }, [messages, startCallListening]);
+  }, [messages, startCallListening, startMicMonitor]);
 
   // ─── End call ─────────────────────────────────────────────────────────
   const endCall = useCallback(() => {
     callActiveRef.current = false;
 
     if (callRecRef.current) {
-      callRecRef.current.abort();
+      try { callRecRef.current.abort(); } catch (e) { /* ignore */ }
       callRecRef.current = null;
     }
     if (silenceTimerRef.current) {
@@ -620,6 +702,7 @@ export default function BobPage({ currentUser, hsToken }) {
       audioRef.current = null;
     }
 
+    stopMicMonitor();
     setSpeaking(false);
     setInCall(false);
     setCallPhase("idle");
@@ -630,7 +713,7 @@ export default function BobPage({ currentUser, hsToken }) {
     if (callMessagesRef.current.length > 0) {
       setMessages([...callMessagesRef.current]);
     }
-  }, []);
+  }, [stopMicMonitor]);
 
   // Auto-scroll call transcript
   useEffect(() => {
@@ -1428,10 +1511,33 @@ export default function BobPage({ currentUser, hsToken }) {
               )}
             </div>
 
+            {/* Mic level visualizer */}
+            {callPhase === "listening" && (
+              <div style={{
+                display: "flex", alignItems: "flex-end", gap: 3,
+                height: 32, marginTop: 20, marginBottom: 4,
+              }}>
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => {
+                  const barCenter = 4; // center bar index
+                  const dist = Math.abs(i - barCenter);
+                  const scale = Math.max(0, micLevel - dist * 0.08);
+                  const h = 4 + scale * 28;
+                  return (
+                    <div key={i} style={{
+                      width: 3, borderRadius: 2,
+                      height: h,
+                      background: micLevel > 0.1 ? `rgba(167,139,250,${0.4 + scale * 0.6})` : "rgba(100,116,139,0.3)",
+                      transition: "height 0.08s ease, background 0.08s ease",
+                    }} />
+                  );
+                })}
+              </div>
+            )}
+
             {/* Live speech preview */}
             {callLiveText && callPhase === "listening" && (
               <div style={{
-                marginTop: 24, padding: "10px 20px", borderRadius: 12,
+                marginTop: 12, padding: "10px 20px", borderRadius: 12,
                 background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
                 maxWidth: 400, fontSize: 13, color: "#c4b5fd", lineHeight: 1.6,
                 textAlign: "center", fontStyle: "italic",
