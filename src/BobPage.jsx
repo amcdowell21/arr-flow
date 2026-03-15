@@ -553,9 +553,9 @@ export default function BobPage({ currentUser, hsToken }) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
-    if (callRecRef.current) {
-      try { callRecRef.current.abort(); } catch (e) { /* ignore */ }
-    }
+    // Don't abort previous — just null out the ref. Aborting kills the shared
+    // browser mic resource and causes the next instance to immediately die too.
+    callRecRef.current = null;
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -564,16 +564,16 @@ export default function BobPage({ currentUser, hsToken }) {
     const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.interimResults = true;
-    recognition.continuous = true;
+    recognition.continuous = false; // Non-continuous — restart manually after each utterance
     recognition.maxAlternatives = 1;
     callRecRef.current = recognition;
 
     let finalTranscript = "";
     let hasSpoken = false;
     const startTime = Date.now();
+    let handledEnd = false; // Prevent double-restart from onerror + onend
 
     setCallPhase("listening");
-    setCallLiveText("");
 
     recognition.onresult = (event) => {
       if (!callActiveRef.current) return;
@@ -608,7 +608,6 @@ export default function BobPage({ currentUser, hsToken }) {
             callRecRef.current = null;
             setCallLiveText("");
             console.log("[Bob Call] Sending after silence:", textToSend.slice(0, 60));
-            // Use ref to always get latest sendCallMessage
             sendCallMessageRef.current(textToSend);
           }
         }, 1500);
@@ -616,13 +615,14 @@ export default function BobPage({ currentUser, hsToken }) {
     };
 
     recognition.onend = () => {
+      if (handledEnd) return;
+      handledEnd = true;
       const lived = Date.now() - startTime;
       console.log("[Bob Call] Recognition ended after", lived, "ms, callActive:", callActiveRef.current, "silenceTimer:", !!silenceTimerRef.current);
-      // If call is still active and silence timer hasn't fired, do a clean restart
       if (callActiveRef.current && !silenceTimerRef.current) {
         callRecRef.current = null;
-        // Back off if recognition died immediately (< 500ms) to avoid tight loop
-        const delay = lived < 500 ? 1000 : 150;
+        // Back off more aggressively if recognition died immediately
+        const delay = lived < 500 ? 2000 : 200;
         setTimeout(() => {
           if (callActiveRef.current && !silenceTimerRef.current) {
             startCallListeningRef.current();
@@ -633,24 +633,18 @@ export default function BobPage({ currentUser, hsToken }) {
 
     recognition.onerror = (e) => {
       console.warn("[Bob Call] Recognition error:", e.error);
-      if (callActiveRef.current && (e.error === "no-speech" || e.error === "aborted")) {
+      // For "aborted" and "no-speech", let onend handle the restart
+      if (e.error === "aborted" || e.error === "no-speech") return;
+      // For other errors, handle here and prevent onend from also restarting
+      handledEnd = true;
+      console.error("[Bob Call] Recognition error:", e.error);
+      if (callActiveRef.current) {
         callRecRef.current = null;
         setTimeout(() => {
           if (callActiveRef.current && !silenceTimerRef.current) {
             startCallListeningRef.current();
           }
-        }, 250);
-      } else if (e.error !== "no-speech" && e.error !== "aborted") {
-        console.error("[Bob Call] Fatal recognition error:", e.error);
-        // Still restart for non-fatal errors to keep the call alive
-        if (callActiveRef.current) {
-          callRecRef.current = null;
-          setTimeout(() => {
-            if (callActiveRef.current && !silenceTimerRef.current) {
-              startCallListeningRef.current();
-            }
-          }, 500);
-        }
+        }, 2000);
       }
     };
 
@@ -659,11 +653,10 @@ export default function BobPage({ currentUser, hsToken }) {
       console.log("[Bob Call] Recognition started");
     } catch (e) {
       console.error("[Bob Call] Recognition start error:", e);
-      // Retry after a brief delay
       if (callActiveRef.current) {
         setTimeout(() => {
           if (callActiveRef.current) startCallListeningRef.current();
-        }, 500);
+        }, 2000);
       }
     }
   }, []);
