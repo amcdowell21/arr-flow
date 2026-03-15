@@ -459,17 +459,40 @@ async function executeTool(name, input, ctx) {
 }
 
 // ─── System prompt ──────────────────────────────────────────────────────────
-function getCurrentDateString() {
+function getDateContext() {
   const now = new Date();
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  return `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()} (${now.toISOString().split("T")[0]})`;
+  const fmt = (d) => `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}`;
+  const iso = (d) => d.toISOString().split("T")[0];
+
+  // Build this week (Mon–Sun) and next week
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + mondayOffset);
+
+  let weekLines = "This week:\n";
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const marker = iso(d) === iso(now) ? " ← TODAY" : "";
+    weekLines += `  ${fmt(d)} (${iso(d)})${marker}\n`;
+  }
+  weekLines += "Next week:\n";
+  for (let i = 7; i < 14; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    weekLines += `  ${fmt(d)} (${iso(d)})\n`;
+  }
+
+  return `Today is ${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()} (${iso(now)})\n\n${weekLines}`;
 }
 
 function getSystemPrompt() {
   return `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help manage pipeline deals, track events, log outbound activity, and organize notes and follow-ups.
 
-Current date: ${getCurrentDateString()}
+${getDateContext()}
 
 You have access to the platform's full data layer through tools. Use them proactively — if a user asks about their deals, call list_deals first. If they want to change something, use the appropriate update tool.
 
