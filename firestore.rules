@@ -83,6 +83,15 @@ service cloud.firestore {
       allow read, write: if isActiveUser() && request.auth.uid == uid;
     }
 
+    match /bobConversations/{convId} {
+      allow read: if isActiveUser()
+        && resource.data.userId == request.auth.uid;
+      allow create: if isActiveUser()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isActiveUser()
+        && resource.data.userId == request.auth.uid;
+    }
+
     // ── Deny everything else ─────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

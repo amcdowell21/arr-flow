@@ -12,6 +12,7 @@ import PipelinePage from "./PipelinePage";
 import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
 import TodosPage from "./TodosPage";
+import BobPage from "./BobPage";
 
 const ADMIN_EMAIL = "admin@uniqlearn.co";
 
@@ -334,6 +335,20 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <circle cx="7" cy="7" r="5.5" stroke={active ? "#6ee7b7" : "var(--text-muted)"} strokeWidth="1.4"/>
           <circle cx="7" cy="7" r="2" fill={active ? "#6ee7b7" : "var(--text-muted)"}/>
+        </svg>
+      ),
+    },
+    {
+      id: "bob",
+      label: "Talk to Bob",
+      color: "#06b6d4",
+      icon: (active) => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1.5" y="2" width="11" height="8" rx="2" stroke={active ? "#67e8f9" : "var(--text-muted)"} strokeWidth="1.3"/>
+          <path d="M4.5 12l2-2h-3z" fill={active ? "#67e8f9" : "var(--text-muted)"}/>
+          <circle cx="5" cy="6" r="0.8" fill={active ? "#67e8f9" : "var(--text-muted)"}/>
+          <circle cx="7" cy="6" r="0.8" fill={active ? "#67e8f9" : "var(--text-muted)"}/>
+          <circle cx="9" cy="6" r="0.8" fill={active ? "#67e8f9" : "var(--text-muted)"}/>
         </svg>
       ),
     },
@@ -762,6 +777,45 @@ function HomePage({ onNavigate, currentUser }) {
           </div>
         </div>
       )}
+
+      {/* Talk to Bob — prominent card above tiles */}
+      <button
+        onClick={() => onNavigate("bob")}
+        style={{
+          width: "100%", maxWidth: 520, textAlign: "left", background: "var(--surface)",
+          border: "1px solid var(--border)", borderRadius: 16, padding: "20px 24px",
+          cursor: "pointer", transition: "all 0.18s", position: "relative", overflow: "hidden",
+          display: "flex", alignItems: "center", gap: 16, marginBottom: 20,
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = "#06b6d412";
+          e.currentTarget.style.borderColor = "#06b6d440";
+          e.currentTarget.style.transform = "translateY(-2px)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = "var(--surface)";
+          e.currentTarget.style.borderColor = "var(--border)";
+          e.currentTarget.style.transform = "translateY(0)";
+        }}
+      >
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg, #06b6d4, #6366f1)", opacity: 0.6 }} />
+        <div style={{
+          width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+          background: "linear-gradient(135deg, #06b6d4 0%, #6366f1 100%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 16, fontWeight: 700, color: "#fff",
+        }}>B</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Talk to Bob</div>
+          <div style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.5 }}>AI agent that can search, update, and manage all your pipeline data.</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: "#06b6d4", fontFamily: "'DM Mono',monospace", fontWeight: 500 }}>Chat</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5h6M5.5 2L9 5l-3.5 3" stroke="#06b6d4" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      </button>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 250px)", gap: 20, justifyContent: "center" }}>
         {tiles.map(tile => (
@@ -1992,6 +2046,9 @@ export default function ARRFlow() {
 
       {/* Admin panel (admin only) */}
       {view === "admin" && isAdmin && <AdminPanel currentUser={currentUser} onNavigate={setView} />}
+
+      {/* Bob AI agent */}
+      {view === "bob" && <BobPage currentUser={currentUser} hsToken={hsToken} />}
 
       {/* Input Metrics (main) content */}
       <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: (view !== "main") ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>
