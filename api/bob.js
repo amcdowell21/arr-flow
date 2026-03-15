@@ -459,9 +459,17 @@ async function executeTool(name, input, ctx) {
 }
 
 // ─── System prompt ──────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help manage pipeline deals, track events, log outbound activity, and organize notes and follow-ups.
+function getCurrentDateString() {
+  const now = new Date();
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()} (${now.toISOString().split("T")[0]})`;
+}
 
-Current date: ${new Date().toISOString().split("T")[0]}
+function getSystemPrompt() {
+  return `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help manage pipeline deals, track events, log outbound activity, and organize notes and follow-ups.
+
+Current date: ${getCurrentDateString()}
 
 You have access to the platform's full data layer through tools. Use them proactively — if a user asks about their deals, call list_deals first. If they want to change something, use the appropriate update tool.
 
@@ -474,6 +482,7 @@ Data model context:
 - Notes use a block editor with types: text, h1, h2, h3, bullet, numbered, todo, quote, code, divider
 
 Be concise and action-oriented. When you make changes, confirm what you did. Use markdown formatting for readability. When listing deals, format them in a clear table or list.`;
+}
 
 // ─── Main handler ───────────────────────────────────────────────────────────
 export default async function handler(req, res) {
@@ -524,7 +533,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 4096,
-          system: SYSTEM_PROMPT,
+          system: getSystemPrompt(),
           tools: TOOLS,
           messages: claudeMessages,
           stream: true,
