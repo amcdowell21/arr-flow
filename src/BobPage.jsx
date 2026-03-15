@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { db } from "./firebase";
-import { collection, query, where, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, deleteDoc, doc, addDoc, updateDoc, serverTimestamp, getDocs } from "firebase/firestore";
 
 // ─── Lightweight markdown renderer ──────────────────────────────────────────
 function renderMarkdown(text) {
@@ -223,12 +223,19 @@ export default function BobPage({ currentUser, hsToken }) {
       collection(db, "bobConversations"),
       where("userId", "==", currentUser.uid)
     );
+    // Try realtime listener first
     const unsub = onSnapshot(q, snap => {
       const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       convs.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
       setConversations(convs);
     }, err => {
       console.error("bobConversations onSnapshot error:", err);
+      // Fallback: one-time fetch if realtime listener fails
+      getDocs(q).then(snap => {
+        const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        convs.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+        setConversations(convs);
+      }).catch(e => console.error("bobConversations getDocs fallback error:", e));
     });
     return unsub;
   }, [currentUser]);
@@ -281,10 +288,10 @@ export default function BobPage({ currentUser, hsToken }) {
 
     // Create or update conversation in Firestore from the client BEFORE calling the API
     let convId = activeConvIdRef.current;
-    try {
-      const msgData = newMessages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
-      if (!convId) {
-        const title = text.slice(0, 60);
+    const msgData = newMessages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
+    if (!convId) {
+      const title = text.slice(0, 60);
+      try {
         const newDoc = await addDoc(collection(db, "bobConversations"), {
           userId: currentUser.uid,
           title,
@@ -295,14 +302,31 @@ export default function BobPage({ currentUser, hsToken }) {
         convId = newDoc.id;
         setActiveConvId(convId);
         activeConvIdRef.current = convId;
-      } else {
+      } catch (e) {
+        console.error("Conversation create error:", e);
+        // Firestore write failed — add to local state directly as fallback
+        const localId = "local_" + Date.now();
+        convId = localId;
+        setActiveConvId(localId);
+        activeConvIdRef.current = localId;
+        setConversations(prev => [{
+          id: localId,
+          title,
+          messages: msgData,
+          userId: currentUser.uid,
+          updatedAt: { seconds: Date.now() / 1000 },
+          createdAt: { seconds: Date.now() / 1000 },
+        }, ...prev]);
+      }
+    } else {
+      try {
         await updateDoc(doc(db, "bobConversations", convId), {
           messages: msgData,
           updatedAt: serverTimestamp(),
         });
+      } catch (e) {
+        console.error("Conversation update error:", e);
       }
-    } catch (e) {
-      console.error("Conversation save error:", e);
     }
 
     try {
@@ -359,16 +383,26 @@ export default function BobPage({ currentUser, hsToken }) {
       setMessages(finalMessages);
       setStreamingText("");
 
-      // Save final messages (with assistant response) to Firestore
+      // Save final messages (with assistant response) to Firestore + local state
       const finalConvId = activeConvIdRef.current;
       if (finalConvId) {
-        try {
-          await updateDoc(doc(db, "bobConversations", finalConvId), {
-            messages: finalMessages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() })),
-            updatedAt: serverTimestamp(),
-          });
-        } catch (e) {
-          console.error("Conversation update error:", e);
+        const finalMsgData = finalMessages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
+        // Always update local state so sidebar stays current
+        setConversations(prev => prev.map(c =>
+          c.id === finalConvId
+            ? { ...c, messages: finalMsgData, updatedAt: { seconds: Date.now() / 1000 } }
+            : c
+        ));
+        // Also persist to Firestore
+        if (!finalConvId.startsWith("local_")) {
+          try {
+            await updateDoc(doc(db, "bobConversations", finalConvId), {
+              messages: finalMsgData,
+              updatedAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.error("Conversation update error:", e);
+          }
         }
       }
     } catch (e) {
