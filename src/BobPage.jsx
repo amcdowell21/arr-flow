@@ -474,6 +474,7 @@ export default function BobPage({ currentUser, hsToken }) {
   const sendCallMessage = useCallback(async (text) => {
     if (!text.trim() || !callActiveRef.current) return;
 
+    console.log("[Bob Call] Sending:", text.slice(0, 50));
     const userMsg = { role: "user", content: text };
     callMessagesRef.current = [...callMessagesRef.current, userMsg];
     callTranscriptRef.current = [...callTranscriptRef.current, { role: "user", content: text, timestamp: Date.now() }];
@@ -505,6 +506,10 @@ export default function BobPage({ currentUser, hsToken }) {
       } catch (e) { console.error("Conv update error:", e); }
     }
 
+    // Abort after 60s to prevent hanging
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
     try {
       const response = await fetch("/api/bob", {
         method: "POST",
@@ -515,10 +520,15 @@ export default function BobPage({ currentUser, hsToken }) {
           userId: currentUser.uid,
           hsToken: hsToken || localStorage.getItem("hs_token") || null,
         }),
+        signal: controller.signal,
       });
 
-      if (!response.ok) throw new Error(`Server error (${response.status})`);
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        throw new Error(`Server error (${response.status}): ${errText.slice(0, 200)}`);
+      }
 
+      console.log("[Bob Call] Response OK, parsing stream...");
       let responseText = "";
       for await (const { event, data } of parseSSE(response)) {
         if (!callActiveRef.current) break;
@@ -528,9 +538,10 @@ export default function BobPage({ currentUser, hsToken }) {
 
       if (!callActiveRef.current) return;
 
-      const assistantMsg = { role: "assistant", content: responseText };
+      console.log("[Bob Call] Got response:", responseText.slice(0, 80));
+      const assistantMsg = { role: "assistant", content: responseText || "(No response)" };
       callMessagesRef.current = [...callMessagesRef.current, assistantMsg];
-      callTranscriptRef.current = [...callTranscriptRef.current, { role: "assistant", content: responseText, timestamp: Date.now() }];
+      callTranscriptRef.current = [...callTranscriptRef.current, { role: "assistant", content: assistantMsg.content, timestamp: Date.now() }];
       setCallTranscript([...callTranscriptRef.current]);
 
       // Also update messages state so chat history persists
@@ -552,8 +563,13 @@ export default function BobPage({ currentUser, hsToken }) {
         startCallListeningRef.current();
       }
     } catch (e) {
-      console.error("Call send error:", e);
+      console.error("[Bob Call] Error:", e);
+      // Add error to transcript so user can see what happened
+      callTranscriptRef.current = [...callTranscriptRef.current, { role: "assistant", content: `Error: ${e.name === "AbortError" ? "Request timed out" : e.message}`, timestamp: Date.now() }];
+      setCallTranscript([...callTranscriptRef.current]);
       if (callActiveRef.current) startCallListeningRef.current();
+    } finally {
+      clearTimeout(timeout);
     }
   }, [currentUser, hsToken, playCallTTS]);
 
@@ -600,7 +616,9 @@ export default function BobPage({ currentUser, hsToken }) {
           hasSpoken = true;
         }
       }
-      setCallLiveText(finalTranscript + interim);
+      const liveText = finalTranscript + interim;
+      console.log("[Bob Call] Speech:", liveText.slice(0, 60));
+      setCallLiveText(liveText);
 
       // Reset silence timer — send after 1.5s of silence
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -613,6 +631,7 @@ export default function BobPage({ currentUser, hsToken }) {
             try { recognition.stop(); } catch (e) { /* ignore */ }
             callRecRef.current = null;
             setCallLiveText("");
+            console.log("[Bob Call] Sending after silence:", textToSend.slice(0, 60));
             // Use ref to always get latest sendCallMessage
             sendCallMessageRef.current(textToSend);
           }
@@ -621,6 +640,7 @@ export default function BobPage({ currentUser, hsToken }) {
     };
 
     recognition.onend = () => {
+      console.log("[Bob Call] Recognition ended, callActive:", callActiveRef.current, "silenceTimer:", !!silenceTimerRef.current);
       // If call is still active and silence timer hasn't fired, do a clean restart
       if (callActiveRef.current && !silenceTimerRef.current) {
         callRecRef.current = null;
@@ -633,6 +653,7 @@ export default function BobPage({ currentUser, hsToken }) {
     };
 
     recognition.onerror = (e) => {
+      console.warn("[Bob Call] Recognition error:", e.error);
       if (callActiveRef.current && (e.error === "no-speech" || e.error === "aborted")) {
         callRecRef.current = null;
         setTimeout(() => {
@@ -641,14 +662,30 @@ export default function BobPage({ currentUser, hsToken }) {
           }
         }, 250);
       } else if (e.error !== "no-speech" && e.error !== "aborted") {
-        console.error("Speech recognition error:", e.error);
+        console.error("[Bob Call] Fatal recognition error:", e.error);
+        // Still restart for non-fatal errors to keep the call alive
+        if (callActiveRef.current) {
+          callRecRef.current = null;
+          setTimeout(() => {
+            if (callActiveRef.current && !silenceTimerRef.current) {
+              startCallListeningRef.current();
+            }
+          }, 500);
+        }
       }
     };
 
     try {
       recognition.start();
+      console.log("[Bob Call] Recognition started");
     } catch (e) {
-      console.error("Recognition start error:", e);
+      console.error("[Bob Call] Recognition start error:", e);
+      // Retry after a brief delay
+      if (callActiveRef.current) {
+        setTimeout(() => {
+          if (callActiveRef.current) startCallListeningRef.current();
+        }, 500);
+      }
     }
   }, []);
 
@@ -814,7 +851,18 @@ export default function BobPage({ currentUser, hsToken }) {
   // Send message
   const sendMessage = useCallback(async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if (!text) return;
+
+    // If streaming got stuck from a previous request, force-reset it
+    if (streaming) {
+      console.warn("[Bob] streaming was stuck, force-resetting");
+      setStreaming(false);
+      setStreamingText("");
+      setActiveTools([]);
+      streamingTextRef.current = "";
+      // Let the reset take effect before proceeding
+      return;
+    }
 
     const userMsg = { role: "user", content: text, timestamp: Date.now() };
     const newMessages = [...messages, userMsg];
@@ -880,7 +928,12 @@ export default function BobPage({ currentUser, hsToken }) {
       }
     }
 
+    // Use AbortController to prevent hanging requests (60s timeout)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
     try {
+      console.log("[Bob] Sending message to /api/bob...", { convId, messageCount: newMessages.length });
       const response = await fetch("/api/bob", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -890,12 +943,15 @@ export default function BobPage({ currentUser, hsToken }) {
           userId: currentUser.uid,
           hsToken: hsToken || localStorage.getItem("hs_token") || null,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
-        throw new Error(`Server error (${response.status})`);
+        const errText = await response.text().catch(() => "");
+        throw new Error(`Server error (${response.status}): ${errText.slice(0, 200)}`);
       }
 
+      console.log("[Bob] Response OK, parsing SSE stream...");
       for await (const { event, data } of parseSSE(response)) {
         switch (event) {
           case "delta":
@@ -928,8 +984,10 @@ export default function BobPage({ currentUser, hsToken }) {
         }
       }
 
+      console.log("[Bob] Stream complete, finalizing...");
+
       // Finalize assistant message
-      const assistantMsg = { role: "assistant", content: streamingTextRef.current, timestamp: Date.now() };
+      const assistantMsg = { role: "assistant", content: streamingTextRef.current || "(No response received)", timestamp: Date.now() };
       const finalMessages = [...newMessages, assistantMsg];
       setMessages(finalMessages);
       setStreamingText("");
@@ -960,9 +1018,14 @@ export default function BobPage({ currentUser, hsToken }) {
         }
       }
     } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", content: `Sorry, something went wrong: ${e.message}`, timestamp: Date.now() }]);
+      console.error("[Bob] sendMessage error:", e);
+      const errMsg = e.name === "AbortError"
+        ? "Request timed out — please try again."
+        : `Sorry, something went wrong: ${e.message}`;
+      setMessages(prev => [...prev, { role: "assistant", content: errMsg, timestamp: Date.now() }]);
       setStreamingText("");
     } finally {
+      clearTimeout(timeout);
       setStreaming(false);
       setActiveTools([]);
     }
