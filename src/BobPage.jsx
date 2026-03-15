@@ -225,15 +225,11 @@ export default function BobPage({ currentUser, hsToken }) {
   const activeConvIdRef = useRef(null);
   const recognitionRef = useRef(null);
   const audioRef = useRef(null);
-  const callRecRef = useRef(null);
-  const silenceTimerRef = useRef(null);
   const callActiveRef = useRef(false);
   const callTimerRef = useRef(null);
   const callTranscriptRef = useRef([]);
   const callMessagesRef = useRef([]);  // full messages for API context
   const callTranscriptEndRef = useRef(null);
-  const sendCallMessageRef = useRef(null);
-  const startCallListeningRef = useRef(null);
   const [micLevel, setMicLevel] = useState(0);
 
   // ─── Speech Recognition setup ───────────────────────────────────────────
@@ -361,368 +357,22 @@ export default function BobPage({ currentUser, hsToken }) {
   }, []);
 
   // ─── Call mode: TTS that returns a promise ─────────────────────────────
-  const playCallTTS = useCallback(async (text) => {
-    if (!text.trim()) return;
+  // ─── Call mode: ElevenLabs Conversational AI ─────────────────────────
+  const elevenConvRef = useRef(null);
+  const micLevelPollRef = useRef(null);
 
-    const cleanText = text
-      .replace(/```[\s\S]*?```/g, " code block omitted ")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/`(.+?)`/g, "$1")
-      .replace(/^#{1,3}\s/gm, "")
-      .replace(/^[-*]\s/gm, "")
-      .replace(/^\d+\.\s/gm, "")
-      .replace(/---+/g, "")
-      .replace(/\n{2,}/g, ". ")
-      .replace(/\n/g, " ")
-      .trim();
-
-    if (!cleanText) return;
-    const truncated = cleanText.length > 1500 ? cleanText.slice(0, 1500) + "..." : cleanText;
-
-    setCallPhase("speaking");
-    setSpeaking(true);
-
-    return new Promise(async (resolve) => {
-      try {
-        const res = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: truncated }),
-        });
-
-        if (!res.ok) {
-          console.error("TTS error:", res.status);
-          setSpeaking(false);
-          resolve();
-          return;
-        }
-
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
-
-        audio.onended = () => {
-          setSpeaking(false);
-          URL.revokeObjectURL(url);
-          audioRef.current = null;
-          resolve();
-        };
-
-        audio.onerror = () => {
-          setSpeaking(false);
-          URL.revokeObjectURL(url);
-          audioRef.current = null;
-          resolve();
-        };
-
-        await audio.play();
-      } catch (e) {
-        console.error("TTS error:", e);
-        setSpeaking(false);
-        resolve();
-      }
-    });
-  }, []);
-
-  // ─── Call mode: mic stream ref (shared between monitor and recorder) ──
-  const micStreamRef = useRef(null);
-  const analyserRef = useRef(null);
-  const animFrameRef = useRef(null);
-  const recorderRef = useRef(null);
-
-  const startMicMonitor = useCallback(() => {
-    if (!micStreamRef.current) return;
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = ctx.createMediaStreamSource(micStreamRef.current);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const tick = () => {
-        if (!analyserRef.current) return;
-        analyser.getByteFrequencyData(data);
-        const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
-        setMicLevel(avg);
-        animFrameRef.current = requestAnimationFrame(tick);
-      };
-      tick();
-    } catch (e) { console.warn("Mic monitor error:", e); }
-  }, []);
-
-  const stopMicMonitor = useCallback(() => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    analyserRef.current = null;
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
-    }
-    setMicLevel(0);
-  }, []);
-
-  // ─── Call mode: send message and get response ─────────────────────────
-  // Using ref pattern to break circular dependency with startCallListening
-  const sendCallMessage = useCallback(async (text) => {
-    if (!text.trim() || !callActiveRef.current) return;
-
-    console.log("[Bob Call] Sending:", text.slice(0, 50));
-    const userMsg = { role: "user", content: text };
-    callMessagesRef.current = [...callMessagesRef.current, userMsg];
-    callTranscriptRef.current = [...callTranscriptRef.current, { role: "user", content: text, timestamp: Date.now() }];
-    setCallTranscript([...callTranscriptRef.current]);
-    setCallPhase("processing");
-
-    // Create/update Firestore conversation
-    let convId = activeConvIdRef.current;
-    const msgData = callMessagesRef.current.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
-    if (!convId) {
-      const title = "Voice Call — " + text.slice(0, 40);
-      try {
-        const newDoc = await addDoc(collection(db, "bobConversations"), {
-          userId: currentUser.uid, title, messages: msgData,
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        });
-        convId = newDoc.id;
-        setActiveConvId(convId);
-        activeConvIdRef.current = convId;
-        setConversations(prev => {
-          if (prev.some(c => c.id === convId)) return prev;
-          return [{ id: convId, title, messages: msgData, userId: currentUser.uid,
-            updatedAt: { seconds: Date.now() / 1000 }, createdAt: { seconds: Date.now() / 1000 } }, ...prev];
-        });
-      } catch (e) { console.error("Conv create error:", e); }
-    } else {
-      try {
-        await updateDoc(doc(db, "bobConversations", convId), { messages: msgData, updatedAt: serverTimestamp() });
-      } catch (e) { console.error("Conv update error:", e); }
-    }
-
-    // Abort after 60s to prevent hanging
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-
-    try {
-      const response = await fetch("/api/bob", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId: convId,
-          messages: callMessagesRef.current.map(m => ({ role: m.role, content: m.content })),
-          userId: currentUser.uid,
-          hsToken: hsToken || localStorage.getItem("hs_token") || null,
-        }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        throw new Error(`Server error (${response.status}): ${errText.slice(0, 200)}`);
-      }
-
-      console.log("[Bob Call] Response OK, parsing stream...");
-      let responseText = "";
-      for await (const { event, data } of parseSSE(response)) {
-        if (!callActiveRef.current) break;
-        if (event === "delta") responseText += data.text;
-        if (event === "error") responseText += ` Error: ${data.message}`;
-      }
-
-      if (!callActiveRef.current) return;
-
-      console.log("[Bob Call] Got response:", responseText.slice(0, 80));
-      const assistantMsg = { role: "assistant", content: responseText || "(No response)" };
-      callMessagesRef.current = [...callMessagesRef.current, assistantMsg];
-      callTranscriptRef.current = [...callTranscriptRef.current, { role: "assistant", content: assistantMsg.content, timestamp: Date.now() }];
-      setCallTranscript([...callTranscriptRef.current]);
-
-      // Also update messages state so chat history persists
-      setMessages([...callMessagesRef.current]);
-
-      // Save to Firestore
-      const finalConvId = activeConvIdRef.current;
-      if (finalConvId && !finalConvId.startsWith("local_")) {
-        const finalMsgData = callMessagesRef.current.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
-        try {
-          await updateDoc(doc(db, "bobConversations", finalConvId), { messages: finalMsgData, updatedAt: serverTimestamp() });
-        } catch (e) { console.error("Conv save error:", e); }
-      }
-
-      // Play TTS, then resume listening
-      await playCallTTS(responseText);
-
-      if (callActiveRef.current) {
-        startCallListeningRef.current();
-      }
-    } catch (e) {
-      console.error("[Bob Call] Error:", e);
-      // Add error to transcript so user can see what happened
-      callTranscriptRef.current = [...callTranscriptRef.current, { role: "assistant", content: `Error: ${e.name === "AbortError" ? "Request timed out" : e.message}`, timestamp: Date.now() }];
-      setCallTranscript([...callTranscriptRef.current]);
-      if (callActiveRef.current) startCallListeningRef.current();
-    } finally {
-      clearTimeout(timeout);
-    }
-  }, [currentUser, hsToken, playCallTTS]);
-
-  // Keep ref in sync
-  useEffect(() => { sendCallMessageRef.current = sendCallMessage; }, [sendCallMessage]);
-
-  // ─── Call mode: record and transcribe with Whisper ────────────────────
-  const startCallListening = useCallback(() => {
-    if (!callActiveRef.current || !micStreamRef.current) return;
-
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
-
-    // Use MediaRecorder to capture audio, then send to Whisper for transcription
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : "audio/webm";
-    const recorder = new MediaRecorder(micStreamRef.current, { mimeType });
-    recorderRef.current = recorder;
-    const chunks = [];
-    let hasSpeech = false;
-
-    setCallPhase("listening");
-    setCallLiveText("");
-    console.log("[Bob Call] Recording started");
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunks.push(e.data);
-        hasSpeech = true;
-      }
-    };
-
-    recorder.onstop = async () => {
-      console.log("[Bob Call] Recording stopped, chunks:", chunks.length);
-      if (!hasSpeech || chunks.length === 0 || !callActiveRef.current) {
-        // No audio captured, restart listening
-        if (callActiveRef.current) {
-          setTimeout(() => startCallListeningRef.current(), 500);
-        }
-        return;
-      }
-
-      setCallPhase("processing");
-      setCallLiveText("Transcribing...");
-
-      try {
-        const blob = new Blob(chunks, { type: mimeType });
-        // Skip tiny recordings (< 1KB is likely silence)
-        if (blob.size < 1000) {
-          console.log("[Bob Call] Audio too small, skipping:", blob.size);
-          setCallLiveText("");
-          if (callActiveRef.current) {
-            setTimeout(() => startCallListeningRef.current(), 200);
-          }
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append("file", blob, "audio.webm");
-        formData.append("model", "whisper-1");
-        formData.append("language", "en");
-
-        const res = await fetch("/api/transcribe", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!res.ok) {
-          const err = await res.text();
-          console.error("[Bob Call] Transcribe error:", err);
-          setCallLiveText("");
-          if (callActiveRef.current) {
-            setTimeout(() => startCallListeningRef.current(), 1000);
-          }
-          return;
-        }
-
-        const { text } = await res.json();
-        console.log("[Bob Call] Whisper transcription:", text);
-
-        if (!text || !text.trim()) {
-          setCallLiveText("");
-          if (callActiveRef.current) {
-            setTimeout(() => startCallListeningRef.current(), 200);
-          }
-          return;
-        }
-
-        setCallLiveText(text);
-        // Send the transcribed text to Bob
-        sendCallMessageRef.current(text.trim());
-      } catch (e) {
-        console.error("[Bob Call] Transcribe fetch error:", e);
-        setCallLiveText("");
-        if (callActiveRef.current) {
-          setTimeout(() => startCallListeningRef.current(), 1000);
-        }
-      }
-    };
-
-    // Record in 500ms chunks for data availability
-    recorder.start(500);
-
-    // Use silence detection via analyser to know when to stop recording
-    const checkSilence = () => {
-      if (!callActiveRef.current || !analyserRef.current || recorder.state !== "recording") return;
-      const data = new Uint8Array(analyserRef.current.frequencyBinCount);
-      analyserRef.current.getByteFrequencyData(data);
-      const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
-
-      if (avg > 0.02) {
-        // Sound detected — reset silence timer
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-      } else if (!silenceTimerRef.current && hasSpeech) {
-        // Silence after speech — stop recording after 1.5s
-        silenceTimerRef.current = setTimeout(() => {
-          silenceTimerRef.current = null;
-          if (recorder.state === "recording") {
-            console.log("[Bob Call] Silence detected, stopping recording");
-            recorder.stop();
-          }
-        }, 1500);
-      }
-
-      if (recorder.state === "recording") {
-        setTimeout(checkSilence, 100);
-      }
-    };
-
-    // Start silence detection after a brief delay
-    setTimeout(checkSilence, 300);
-
-    // Safety: max recording length of 30s
-    setTimeout(() => {
-      if (recorder.state === "recording") {
-        console.log("[Bob Call] Max recording time reached");
-        recorder.stop();
-      }
-    }, 30000);
-  }, []);
-
-  // Keep ref in sync
-  useEffect(() => { startCallListeningRef.current = startCallListening; }, [startCallListening]);
-
-  // ─── Start call ───────────────────────────────────────────────────────
   const startCall = useCallback(async () => {
-    // Get mic stream — keep it open for the entire call
+    // Get signed WebSocket URL from our API
+    console.log("[Bob Call] Getting signed URL...");
+    let signedUrl;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStreamRef.current = stream;
-      console.log("[Bob Call] Mic stream acquired");
+      const res = await fetch("/api/eleven-signed-url");
+      if (!res.ok) throw new Error(`Failed to get signed URL: ${res.status}`);
+      const data = await res.json();
+      signedUrl = data.signed_url;
+      console.log("[Bob Call] Got signed URL");
     } catch (e) {
-      console.error("[Bob Call] Mic permission denied:", e);
+      console.error("[Bob Call] Signed URL error:", e);
       return;
     }
 
@@ -740,26 +390,92 @@ export default function BobPage({ currentUser, hsToken }) {
       setCallSeconds(s => s + 1);
     }, 1000);
 
-    // Start mic level monitor, then start listening
-    startMicMonitor();
-    setTimeout(() => startCallListening(), 300);
-  }, [messages, startCallListening, startMicMonitor]);
+    try {
+      const { Conversation } = await import("@11labs/client");
+
+      const conversation = await Conversation.startSession({
+        signedUrl,
+        onConnect: () => {
+          console.log("[Bob Call] ElevenLabs connected");
+          setCallPhase("listening");
+        },
+        onDisconnect: () => {
+          console.log("[Bob Call] ElevenLabs disconnected");
+          if (callActiveRef.current) {
+            // Unexpected disconnect — end the call
+            callActiveRef.current = false;
+            setInCall(false);
+            setCallPhase("idle");
+          }
+        },
+        onMessage: (msg) => {
+          console.log("[Bob Call] Message:", msg);
+          // Handle transcription and agent messages
+          if (msg.source === "user" && msg.message) {
+            callTranscriptRef.current = [...callTranscriptRef.current, { role: "user", content: msg.message, timestamp: Date.now() }];
+            setCallTranscript([...callTranscriptRef.current]);
+            callMessagesRef.current = [...callMessagesRef.current, { role: "user", content: msg.message }];
+          } else if (msg.source === "ai" && msg.message) {
+            callTranscriptRef.current = [...callTranscriptRef.current, { role: "assistant", content: msg.message, timestamp: Date.now() }];
+            setCallTranscript([...callTranscriptRef.current]);
+            callMessagesRef.current = [...callMessagesRef.current, { role: "assistant", content: msg.message }];
+          }
+        },
+        onError: (err) => {
+          console.error("[Bob Call] ElevenLabs error:", err);
+        },
+        onModeChange: (mode) => {
+          console.log("[Bob Call] Mode:", mode.mode);
+          if (mode.mode === "speaking") {
+            setCallPhase("speaking");
+            setSpeaking(true);
+          } else {
+            setCallPhase("listening");
+            setSpeaking(false);
+          }
+        },
+      });
+
+      elevenConvRef.current = conversation;
+      console.log("[Bob Call] Session started, conversation ID:", conversation.getId());
+
+      // Poll mic level from the ElevenLabs SDK
+      micLevelPollRef.current = setInterval(() => {
+        if (elevenConvRef.current) {
+          const vol = elevenConvRef.current.getInputVolume();
+          setMicLevel(vol);
+        }
+      }, 100);
+
+      // If there's existing conversation context, send it
+      if (messages.length > 0) {
+        const contextSummary = messages
+          .slice(-6)
+          .map(m => `${m.role === "user" ? "User" : "Bob"}: ${m.content.slice(0, 200)}`)
+          .join("\n");
+        conversation.sendContextualUpdate(
+          `Previous conversation context:\n${contextSummary}\n\nContinue the conversation naturally.`
+        );
+      }
+    } catch (e) {
+      console.error("[Bob Call] Failed to start ElevenLabs session:", e);
+      callActiveRef.current = false;
+      setInCall(false);
+      setCallPhase("idle");
+    }
+  }, [messages]);
 
   // ─── End call ─────────────────────────────────────────────────────────
-  const endCall = useCallback(() => {
+  const endCall = useCallback(async () => {
     callActiveRef.current = false;
 
-    if (recorderRef.current && recorderRef.current.state === "recording") {
-      try { recorderRef.current.stop(); } catch (e) { /* ignore */ }
+    if (micLevelPollRef.current) {
+      clearInterval(micLevelPollRef.current);
+      micLevelPollRef.current = null;
     }
-    recorderRef.current = null;
-    if (callRecRef.current) {
-      try { callRecRef.current.abort(); } catch (e) { /* ignore */ }
-      callRecRef.current = null;
-    }
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
+    if (elevenConvRef.current) {
+      try { await elevenConvRef.current.endSession(); } catch (_) { /* ignore */ }
+      elevenConvRef.current = null;
     }
     if (callTimerRef.current) {
       clearInterval(callTimerRef.current);
@@ -770,18 +486,36 @@ export default function BobPage({ currentUser, hsToken }) {
       audioRef.current = null;
     }
 
-    stopMicMonitor();
     setSpeaking(false);
     setInCall(false);
     setCallPhase("idle");
     setCallLiveText("");
     setCallSeconds(0);
+    setMicLevel(0);
 
-    // Sync call messages back to chat
+    // Sync call messages back to chat and save to Firestore
     if (callMessagesRef.current.length > 0) {
       setMessages([...callMessagesRef.current]);
+
+      // Save conversation to Firestore
+      try {
+        const convId = activeConvIdRef.current;
+        const msgData = callMessagesRef.current.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
+        if (convId) {
+          await updateDoc(doc(db, "bobConversations", convId), { messages: msgData, updatedAt: serverTimestamp() });
+        } else {
+          const firstUserMsg = callMessagesRef.current.find(m => m.role === "user");
+          const title = "Voice Call — " + (firstUserMsg?.content?.slice(0, 40) || "Untitled");
+          const newDoc = await addDoc(collection(db, "bobConversations"), {
+            userId: currentUser.uid, title, messages: msgData,
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          });
+          setActiveConvId(newDoc.id);
+          activeConvIdRef.current = newDoc.id;
+        }
+      } catch (e) { console.error("Conv save error:", e); }
     }
-  }, [stopMicMonitor]);
+  }, [currentUser]);
 
   // Auto-scroll call transcript
   useEffect(() => {
