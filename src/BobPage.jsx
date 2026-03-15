@@ -272,6 +272,46 @@ export default function BobPage({ currentUser, hsToken }) {
     if (activeConvId === convId) newChat();
   }, [activeConvId, newChat]);
 
+  // Rename conversation
+  const [editingConvId, setEditingConvId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const renameInputRef = useRef(null);
+
+  const startRename = useCallback((conv, e) => {
+    e.stopPropagation();
+    setEditingConvId(conv.id);
+    setEditingTitle(conv.title || "");
+  }, []);
+
+  const commitRename = useCallback(async () => {
+    if (!editingConvId) return;
+    const trimmed = editingTitle.trim();
+    if (trimmed) {
+      setConversations(prev => prev.map(c => c.id === editingConvId ? { ...c, title: trimmed } : c));
+      if (!editingConvId.startsWith("local_")) {
+        try {
+          await updateDoc(doc(db, "bobConversations", editingConvId), { title: trimmed });
+        } catch (e) {
+          console.error("Rename error:", e);
+        }
+      }
+    }
+    setEditingConvId(null);
+    setEditingTitle("");
+  }, [editingConvId, editingTitle]);
+
+  const cancelRename = useCallback(() => {
+    setEditingConvId(null);
+    setEditingTitle("");
+  }, []);
+
+  useEffect(() => {
+    if (editingConvId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [editingConvId]);
+
   // Send message
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -302,6 +342,18 @@ export default function BobPage({ currentUser, hsToken }) {
         convId = newDoc.id;
         setActiveConvId(convId);
         activeConvIdRef.current = convId;
+        // Always add to local state so sidebar updates even if onSnapshot isn't active
+        setConversations(prev => {
+          if (prev.some(c => c.id === convId)) return prev;
+          return [{
+            id: convId,
+            title,
+            messages: msgData,
+            userId: currentUser.uid,
+            updatedAt: { seconds: Date.now() / 1000 },
+            createdAt: { seconds: Date.now() / 1000 },
+          }, ...prev];
+        });
       } catch (e) {
         console.error("Conversation create error:", e);
         // Firestore write failed — add to local state directly as fallback
@@ -427,6 +479,8 @@ export default function BobPage({ currentUser, hsToken }) {
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .conv-row:hover .conv-action-btn { opacity: 0.6 !important; }
+        .conv-action-btn:hover { opacity: 1 !important; }
       `}</style>
 
       {/* Conversation sidebar */}
@@ -460,7 +514,8 @@ export default function BobPage({ currentUser, hsToken }) {
             {conversations.map(conv => (
               <div
                 key={conv.id}
-                onClick={() => loadConversation(conv)}
+                className="conv-row"
+                onClick={() => { if (editingConvId !== conv.id) loadConversation(conv); }}
                 style={{
                   padding: "10px 12px", cursor: "pointer",
                   background: activeConvId === conv.id ? "rgba(6,182,212,0.08)" : "transparent",
@@ -474,32 +529,70 @@ export default function BobPage({ currentUser, hsToken }) {
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
                   <path d="M2 3a1 1 0 011-1h6a1 1 0 011 1v5a1 1 0 01-1 1H5l-2 1.5V9H3a1 1 0 01-1-1V3z" stroke="#64748b" strokeWidth="1.2"/>
                 </svg>
-                <span style={{
-                  flex: 1, fontSize: 12, color: activeConvId === conv.id ? "#e2e8f0" : "#94a3b8",
-                  fontFamily: "'DM Sans',sans-serif", overflow: "hidden", textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}>
-                  {conv.title || "New conversation"}
-                </span>
-                <button
-                  onClick={(e) => deleteConversation(conv.id, e)}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer", padding: 2,
-                    color: "#475569", opacity: 0, transition: "opacity 0.12s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.color = "#ef4444"; }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = 0; }}
-                  ref={el => {
-                    if (!el) return;
-                    const parent = el.parentElement;
-                    parent.addEventListener("mouseenter", () => el.style.opacity = "0.6");
-                    parent.addEventListener("mouseleave", () => el.style.opacity = "0");
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                  </svg>
-                </button>
+                {editingConvId === conv.id ? (
+                  <input
+                    ref={renameInputRef}
+                    value={editingTitle}
+                    onChange={e => setEditingTitle(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") commitRename();
+                      if (e.key === "Escape") cancelRename();
+                    }}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      flex: 1, fontSize: 12, color: "#e2e8f0",
+                      fontFamily: "'DM Sans',sans-serif",
+                      background: "#0f172a", border: "1px solid #06b6d4", borderRadius: 4,
+                      padding: "2px 6px", outline: "none", minWidth: 0,
+                    }}
+                  />
+                ) : (
+                  <span
+                    onDoubleClick={e => startRename(conv, e)}
+                    style={{
+                      flex: 1, fontSize: 12, color: activeConvId === conv.id ? "#e2e8f0" : "#94a3b8",
+                      fontFamily: "'DM Sans',sans-serif", overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {conv.title || "New conversation"}
+                  </span>
+                )}
+                {editingConvId !== conv.id && (
+                  <>
+                    {/* Rename button */}
+                    <button
+                      onClick={e => startRename(conv, e)}
+                      className="conv-action-btn"
+                      style={{
+                        background: "none", border: "none", cursor: "pointer", padding: 2,
+                        color: "#475569", opacity: 0, transition: "opacity 0.12s", flexShrink: 0,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.color = "#06b6d4"; }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = 0; }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M7.5 1.5l1 1-5.5 5.5H2V7L7.5 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    {/* Delete button */}
+                    <button
+                      onClick={e => deleteConversation(conv.id, e)}
+                      className="conv-action-btn"
+                      style={{
+                        background: "none", border: "none", cursor: "pointer", padding: 2,
+                        color: "#475569", opacity: 0, transition: "opacity 0.12s", flexShrink: 0,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.color = "#ef4444"; }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = 0; }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  </>
+                )}
               </div>
             ))}
             {conversations.length === 0 && (
