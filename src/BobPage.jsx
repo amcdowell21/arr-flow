@@ -579,6 +579,7 @@ export default function BobPage({ currentUser, hsToken }) {
     recognition.lang = "en-US";
     recognition.interimResults = true;
     recognition.continuous = true;
+    recognition.maxAlternatives = 1;
     callRecRef.current = recognition;
 
     let finalTranscript = "";
@@ -620,33 +621,27 @@ export default function BobPage({ currentUser, hsToken }) {
     };
 
     recognition.onend = () => {
-      // If call is still active and silence timer hasn't fired, restart
-      if (callActiveRef.current && callRecRef.current === recognition) {
+      // If call is still active and silence timer hasn't fired, do a clean restart
+      if (callActiveRef.current && !silenceTimerRef.current) {
+        callRecRef.current = null;
         setTimeout(() => {
           if (callActiveRef.current && !silenceTimerRef.current) {
-            try { recognition.start(); } catch (e) { /* ignore */ }
+            startCallListeningRef.current();
           }
-        }, 100);
+        }, 150);
       }
     };
 
     recognition.onerror = (e) => {
       if (callActiveRef.current && (e.error === "no-speech" || e.error === "aborted")) {
+        callRecRef.current = null;
         setTimeout(() => {
           if (callActiveRef.current && !silenceTimerRef.current) {
-            try {
-              const r = new SpeechRecognition();
-              r.lang = "en-US";
-              r.interimResults = true;
-              r.continuous = true;
-              r.onresult = recognition.onresult;
-              r.onend = recognition.onend;
-              r.onerror = recognition.onerror;
-              callRecRef.current = r;
-              r.start();
-            } catch (err) { /* ignore */ }
+            startCallListeningRef.current();
           }
-        }, 200);
+        }, 250);
+      } else if (e.error !== "no-speech" && e.error !== "aborted") {
+        console.error("Speech recognition error:", e.error);
       }
     };
 
@@ -676,9 +671,9 @@ export default function BobPage({ currentUser, hsToken }) {
       setCallSeconds(s => s + 1);
     }, 1000);
 
-    // Start mic monitor + listening
-    startMicMonitor();
+    // Start listening first, then mic monitor (so SpeechRecognition grabs mic first)
     startCallListening();
+    setTimeout(() => startMicMonitor(), 300);
   }, [messages, startCallListening, startMicMonitor]);
 
   // ─── End call ─────────────────────────────────────────────────────────
