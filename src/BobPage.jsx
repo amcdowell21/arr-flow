@@ -211,10 +211,139 @@ export default function BobPage({ currentUser, hsToken }) {
   const [streamingText, setStreamingText] = useState("");
   const [activeTools, setActiveTools] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const streamingTextRef = useRef("");
   const activeConvIdRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const audioRef = useRef(null);
+
+  // ─── Speech Recognition setup ───────────────────────────────────────────
+  const startListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognitionRef.current = recognition;
+
+    let finalTranscript = "";
+
+    recognition.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setInput(finalTranscript + interim);
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+    };
+
+    recognition.onerror = () => {
+      setListening(false);
+    };
+
+    recognition.start();
+    setListening(true);
+  }, []);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setListening(false);
+  }, []);
+
+  // ─── TTS playback ──────────────────────────────────────────────────────
+  const playTTS = useCallback(async (text) => {
+    if (!voiceEnabled || !text.trim()) return;
+
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // Strip markdown for cleaner speech
+    const cleanText = text
+      .replace(/```[\s\S]*?```/g, " code block omitted ")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/`(.+?)`/g, "$1")
+      .replace(/^#{1,3}\s/gm, "")
+      .replace(/^[-*]\s/gm, "")
+      .replace(/^\d+\.\s/gm, "")
+      .replace(/---+/g, "")
+      .replace(/\n{2,}/g, ". ")
+      .replace(/\n/g, " ")
+      .trim();
+
+    if (!cleanText) return;
+
+    // Truncate very long responses to keep TTS reasonable
+    const truncated = cleanText.length > 1000 ? cleanText.slice(0, 1000) + "..." : cleanText;
+
+    setSpeaking(true);
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: truncated }),
+      });
+
+      if (!res.ok) {
+        console.error("TTS error:", res.status);
+        setSpeaking(false);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setSpeaking(false);
+        URL.revokeObjectURL(url);
+        audioRef.current = null;
+      };
+
+      audio.onerror = () => {
+        setSpeaking(false);
+        URL.revokeObjectURL(url);
+        audioRef.current = null;
+      };
+
+      await audio.play();
+    } catch (e) {
+      console.error("TTS playback error:", e);
+      setSpeaking(false);
+    }
+  }, [voiceEnabled]);
+
+  const stopSpeaking = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setSpeaking(false);
+  }, []);
 
   // Load conversations list
   useEffect(() => {
@@ -433,6 +562,9 @@ export default function BobPage({ currentUser, hsToken }) {
       setMessages(finalMessages);
       setStreamingText("");
 
+      // Auto-play TTS if voice mode is on
+      playTTS(streamingTextRef.current);
+
       // Save final messages (with assistant response) to Firestore + local state
       const finalConvId = activeConvIdRef.current;
       if (finalConvId) {
@@ -462,7 +594,7 @@ export default function BobPage({ currentUser, hsToken }) {
       setStreaming(false);
       setActiveTools([]);
     }
-  }, [input, streaming, messages, activeConvId, currentUser, hsToken]);
+  }, [input, streaming, messages, activeConvId, currentUser, hsToken, playTTS]);
 
   // Handle Enter key
   const handleKeyDown = (e) => {
@@ -477,6 +609,8 @@ export default function BobPage({ currentUser, hsToken }) {
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes voiceBar { from{height:4px} to{height:14px} }
+        @keyframes micPulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)} 50%{box-shadow:0 0 0 8px rgba(239,68,68,0)} }
         .conv-row:hover .conv-action-btn { opacity: 0.6 !important; }
         .conv-action-btn:hover { opacity: 1 !important; }
       `}</style>
@@ -627,10 +761,72 @@ export default function BobPage({ currentUser, hsToken }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 11, fontWeight: 700, color: "#fff",
           }}>B</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Bob</div>
             <div style={{ fontSize: 10, color: "#64748b", fontFamily: "'DM Mono',monospace" }}>Revenue Operations Agent</div>
           </div>
+
+          {/* Voice mode toggle */}
+          <button
+            onClick={() => {
+              if (voiceEnabled) { stopSpeaking(); setVoiceEnabled(false); }
+              else setVoiceEnabled(true);
+            }}
+            title={voiceEnabled ? "Disable voice" : "Enable voice"}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "5px 10px", borderRadius: 8,
+              background: voiceEnabled ? "rgba(6,182,212,0.12)" : "transparent",
+              border: `1px solid ${voiceEnabled ? "rgba(6,182,212,0.3)" : "#334155"}`,
+              color: voiceEnabled ? "#67e8f9" : "#64748b",
+              fontSize: 11, fontFamily: "'DM Mono',monospace",
+              cursor: "pointer", transition: "all 0.15s",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {voiceEnabled ? (
+                <>
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
+                  <path d="M15.54 8.46a5 5 0 010 7.07" />
+                  <path d="M19.07 4.93a10 10 0 010 14.14" />
+                </>
+              ) : (
+                <>
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </>
+              )}
+            </svg>
+            {voiceEnabled ? "Voice On" : "Voice Off"}
+          </button>
+
+          {/* Speaking indicator */}
+          {speaking && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 5,
+              fontSize: 10, color: "#67e8f9", fontFamily: "'DM Mono',monospace",
+            }}>
+              <span style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                {[0, 1, 2, 3].map(i => (
+                  <span key={i} style={{
+                    width: 2, background: "#06b6d4", borderRadius: 1,
+                    animation: `voiceBar 0.8s ease-in-out ${i * 0.15}s infinite alternate`,
+                  }} />
+                ))}
+              </span>
+              <button
+                onClick={stopSpeaking}
+                style={{
+                  background: "none", border: "none", color: "#64748b",
+                  cursor: "pointer", fontSize: 10, padding: "0 2px",
+                  fontFamily: "'DM Mono',monospace",
+                }}
+              >
+                Stop
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Messages area */}
@@ -757,6 +953,39 @@ export default function BobPage({ currentUser, hsToken }) {
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
               }}
             />
+            {/* Mic button */}
+            {(window.SpeechRecognition || window.webkitSpeechRecognition) && (
+              <button
+                onClick={() => {
+                  if (listening) {
+                    stopListening();
+                  } else {
+                    startListening();
+                  }
+                }}
+                disabled={streaming}
+                title={listening ? "Stop listening" : "Start voice input"}
+                style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  background: listening ? "rgba(239,68,68,0.15)" : "transparent",
+                  border: listening ? "1px solid rgba(239,68,68,0.4)" : "1px solid #334155",
+                  color: listening ? "#ef4444" : "#64748b",
+                  cursor: streaming ? "default" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                  animation: listening ? "micPulse 1.5s infinite" : "none",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="1" width="6" height="12" rx="3" fill={listening ? "currentColor" : "none"} />
+                  <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              </button>
+            )}
+
+            {/* Send button */}
             <button
               onClick={sendMessage}
               disabled={!input.trim() || streaming}
