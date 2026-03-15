@@ -364,13 +364,14 @@ export default function BobPage({ currentUser, hsToken }) {
   const startCall = useCallback(async () => {
     // Get signed WebSocket URL from our API
     console.log("[Bob Call] Getting signed URL...");
-    let signedUrl;
+    let signedUrl, voiceId;
     try {
       const res = await fetch("/api/eleven-signed-url");
       if (!res.ok) throw new Error(`Failed to get signed URL: ${res.status}`);
       const data = await res.json();
       signedUrl = data.signed_url;
-      console.log("[Bob Call] Got signed URL");
+      voiceId = data.voice_id;
+      console.log("[Bob Call] Got signed URL, voice:", voiceId);
     } catch (e) {
       console.error("[Bob Call] Signed URL error:", e);
       return;
@@ -408,6 +409,7 @@ export default function BobPage({ currentUser, hsToken }) {
 
       const conversation = await Conversation.startSession({
         signedUrl,
+        overrides: voiceId ? { tts: { voiceId } } : undefined,
         clientTools: {
           // These tools let the agent query real platform data from Firestore
           list_deals: async () => {

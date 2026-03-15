@@ -26,7 +26,10 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    return res.status(200).json({ signed_url: data.signed_url });
+    return res.status(200).json({
+      signed_url: data.signed_url,
+      voice_id: process.env.VOICE_ID || null,
+    });
   } catch (e) {
     console.error("Signed URL error:", e);
     return res.status(500).json({ error: e.message });
