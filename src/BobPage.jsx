@@ -393,8 +393,33 @@ export default function BobPage({ currentUser, hsToken }) {
     try {
       const { Conversation } = await import("@11labs/client");
 
+      // Build context from existing conversation for the agent prompt
+      let contextBlock = "";
+      if (messages.length > 0) {
+        contextBlock = "\n\nPrevious conversation context:\n" + messages
+          .slice(-6)
+          .map(m => `${m.role === "user" ? "User" : "Bob"}: ${m.content.slice(0, 200)}`)
+          .join("\n") + "\n\nContinue the conversation naturally.";
+      }
+
+      const bobPrompt = `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help the user think through their pipeline, deals, outbound activity, and sales strategy.
+
+Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}.
+
+Keep responses SHORT and conversational — you're in a live voice call. Don't list things out unless asked. Be warm, natural, and action-oriented. Think of yourself as a smart sales ops buddy.
+
+The user sells to K-12 school districts. Their pipeline has buckets: active, future Q1/Q2, future Q3/Q4, renewal. They track outbound touches, meetings booked, events attended, and deal confidence.${contextBlock}`;
+
       const conversation = await Conversation.startSession({
         signedUrl,
+        overrides: {
+          agent: {
+            prompt: { prompt: bobPrompt },
+            firstMessage: messages.length > 0
+              ? "Hey, I'm here. What's on your mind?"
+              : "Hey! I'm Bob, your rev ops assistant. What can I help you with?",
+          },
+        },
         onConnect: () => {
           console.log("[Bob Call] ElevenLabs connected");
           setCallPhase("listening");
@@ -447,16 +472,6 @@ export default function BobPage({ currentUser, hsToken }) {
         }
       }, 100);
 
-      // If there's existing conversation context, send it
-      if (messages.length > 0) {
-        const contextSummary = messages
-          .slice(-6)
-          .map(m => `${m.role === "user" ? "User" : "Bob"}: ${m.content.slice(0, 200)}`)
-          .join("\n");
-        conversation.sendContextualUpdate(
-          `Previous conversation context:\n${contextSummary}\n\nContinue the conversation naturally.`
-        );
-      }
     } catch (e) {
       console.error("[Bob Call] Failed to start ElevenLabs session:", e);
       callActiveRef.current = false;
