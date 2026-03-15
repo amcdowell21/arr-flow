@@ -598,7 +598,33 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
 }
 
 // ─── Home Page ────────────────────────────────────────────────────────────────
-function HomePage({ onNavigate }) {
+function HomePage({ onNavigate, currentUser }) {
+  const [followUps, setFollowUps] = useState({});
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const ref = doc(db, "userNotes", currentUser.uid);
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) setFollowUps(snap.data().followUps || {});
+    });
+    return unsub;
+  }, [currentUser]);
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const dueToday = Object.entries(followUps)
+    .filter(([, fu]) => fu.date === todayStr && !fu.completed)
+    .map(([key, fu]) => ({ key, ...fu }));
+
+  function toggleFollowUpComplete(key) {
+    if (!currentUser) return;
+    const fu = followUps[key];
+    if (!fu) return;
+    const next = { ...followUps, [key]: { ...fu, completed: !fu.completed } };
+    setFollowUps(next);
+    setDoc(doc(db, "userNotes", currentUser.uid), { followUps: next }, { merge: true }).catch(() => {});
+  }
+
   const tiles = [
     {
       id: "pipeline",
@@ -661,6 +687,81 @@ function HomePage({ onNavigate }) {
           Choose a workspace to get started.
         </p>
       </div>
+
+      {/* Follow Ups Due Today — above tiles */}
+      {dueToday.length > 0 && (
+        <div style={{ width: "100%", maxWidth: 520, marginBottom: 32 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase",
+            letterSpacing: "0.1em", fontFamily: "'DM Sans',sans-serif", marginBottom: 12,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#f59e0b", display: "inline-block" }} />
+            Follow Ups Due Today
+            <span style={{ fontSize: 10, fontFamily: "'DM Mono',monospace", color: "#f59e0b", fontWeight: 600 }}>
+              {dueToday.length}
+            </span>
+          </div>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 12, overflow: "hidden",
+          }}>
+            {dueToday.map((fu, i) => (
+              <div
+                key={fu.key}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "12px 16px", background: "transparent",
+                  borderTop: i > 0 ? "1px solid var(--border)" : "none",
+                  transition: "background 0.12s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.06)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <button
+                  onClick={e => { e.stopPropagation(); toggleFollowUpComplete(fu.key); }}
+                  style={{
+                    width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+                    background: "transparent", border: "1.5px solid #334155",
+                    cursor: "pointer", display: "flex", alignItems: "center",
+                    justifyContent: "center", transition: "all 0.15s", padding: 0,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ade80"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#334155"; }}
+                />
+                <button
+                  onClick={() => onNavigate("todos", { tab: "meetings", dealKey: fu.dealName || fu.dealId })}
+                  style={{
+                    flex: 1, display: "flex", alignItems: "center", gap: 10,
+                    background: "transparent", border: "none",
+                    cursor: "pointer", textAlign: "left", padding: 0,
+                  }}
+                >
+                  <span style={{
+                    fontSize: 13, color: "#e2e8f0", fontFamily: "'DM Sans',sans-serif",
+                    flex: 1, lineHeight: 1.5,
+                  }}>
+                    {fu.todoText}
+                  </span>
+                  {fu.dealName && (
+                    <span style={{
+                      flexShrink: 0, fontSize: 10, fontWeight: 600,
+                      background: "rgba(99,102,241,0.15)", color: "#a5b4fc",
+                      borderRadius: 4, padding: "3px 8px", fontFamily: "'DM Sans',sans-serif",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {fu.dealName}
+                    </span>
+                  )}
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0 }}>
+                    <path d="M2 5h6M5.5 2L9 5l-3.5 3" stroke="#475569" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 250px)", gap: 20, justifyContent: "center" }}>
         {tiles.map(tile => (
@@ -1603,6 +1704,7 @@ export default function ARRFlow() {
   const [hsError, setHsError]       = useState(null);
   const [hsLastSync, setHsLastSync] = useState(null);
   const [view, setView]             = useState("home");
+  const [todosNav, setTodosNav]     = useState(null); // { tab, dealKey } for deep-linking into TodosPage
   const [nodeTypes, setNodeTypes] = useState({});
   const pageRef = useRef(null);
 
@@ -1877,7 +1979,7 @@ export default function ARRFlow() {
       <div style={{ flex: 1, overflowY: "auto", height: "100vh", minWidth: 0 }}>
 
       {/* Home page */}
-      {view === "home" && <HomePage onNavigate={setView} />}
+      {view === "home" && <HomePage onNavigate={(v, nav) => { if (nav) setTodosNav(nav); setView(v); }} currentUser={currentUser} />}
 
       {/* HubSpot page */}
       {view === "hubspot" && <HubSpotPage hs={hs} />}
@@ -1886,7 +1988,7 @@ export default function ARRFlow() {
       {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} hsToken={hsToken} onHsDealClosed={handleHsDealClosed} />}
 
       {/* Notes & Todos page (user-specific) */}
-      {view === "todos" && <TodosPage currentUser={currentUser} />}
+      {view === "todos" && <TodosPage currentUser={currentUser} initialNav={todosNav} onNavConsumed={() => setTodosNav(null)} />}
 
       {/* Admin panel (admin only) */}
       {view === "admin" && isAdmin && <AdminPanel currentUser={currentUser} onNavigate={setView} />}

@@ -458,23 +458,37 @@ function BlockRow({
 
         {/* Editable area + placeholder */}
         <div style={{ flex: 1, position: "relative" }}>
-          <div
-            ref={editRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={handleInput}
-            onKeyDown={handleKeyDown}
-            style={{ ...blockStyle, outline: "none", minHeight: "1.5em" }}
-          />
-          {isEmpty && (
-            <div style={{
-              ...blockStyle,
-              position: "absolute", top: 0, left: 0,
-              color: "#2d3f55", pointerEvents: "none", userSelect: "none",
-            }}>
-              {placeholder}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ flex: 1, position: "relative" }}>
+              <div
+                ref={editRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleInput}
+                onKeyDown={handleKeyDown}
+                style={{ ...blockStyle, outline: "none", minHeight: "1.5em" }}
+              />
+              {isEmpty && (
+                <div style={{
+                  ...blockStyle,
+                  position: "absolute", top: 0, left: 0,
+                  color: "#2d3f55", pointerEvents: "none", userSelect: "none",
+                }}>
+                  {placeholder}
+                </div>
+              )}
             </div>
-          )}
+            {block.type === "todo" && block.dealName && (
+              <span style={{
+                flexShrink: 0, marginTop: 3, fontSize: 10, fontWeight: 600,
+                background: "rgba(99,102,241,0.15)", color: "#a5b4fc",
+                borderRadius: 4, padding: "2px 8px", fontFamily: "'DM Sans',sans-serif",
+                whiteSpace: "nowrap",
+              }}>
+                {block.dealName}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -590,8 +604,97 @@ function DealLinkPicker({ transcriptId, linkMode, linkedDealId, deals, onLink })
   );
 }
 
+// ── Mini Calendar Picker ──────────────────────────────────────────────────────
+function MiniCalendarPicker({ onSelect, onClose }) {
+  const [view, setView] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const { year, month } = view;
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = new Date(year, month).toLocaleString("en-US", { month: "short", year: "numeric" });
+
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const d = i - firstDay + 1;
+    cells.push(d >= 1 && d <= daysInMonth ? d : null);
+  }
+  // trim trailing empty rows
+  while (cells.length > 35 && cells.slice(-7).every(c => c === null)) cells.splice(-7);
+
+  const prev = () => setView(v => ({ year: v.month === 0 ? v.year - 1 : v.year, month: v.month === 0 ? 11 : v.month - 1 }));
+  const next = () => setView(v => ({ year: v.month === 11 ? v.year + 1 : v.year, month: v.month === 11 ? 0 : v.month + 1 }));
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (!e.target.closest("[data-minical]")) onClose();
+    }
+    setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  return (
+    <div
+      data-minical
+      style={{
+        position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 3000,
+        background: "#1e293b", border: "1px solid #334155", borderRadius: 10,
+        boxShadow: "0 10px 40px rgba(0,0,0,0.6)", padding: 10, width: 230,
+        fontFamily: "'DM Sans',sans-serif",
+      }}
+    >
+      {/* Month nav */}
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+        <button onClick={prev} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>‹</button>
+        <span style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>{monthLabel}</span>
+        <button onClick={next} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>›</button>
+      </div>
+      {/* Day headers */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 1, marginBottom: 2 }}>
+        {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+          <div key={d} style={{ textAlign: "center", fontSize: 9, color: "#475569", fontFamily: "'DM Mono',monospace", padding: 2 }}>{d}</div>
+        ))}
+      </div>
+      {/* Day cells */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 1 }}>
+        {cells.map((day, i) => {
+          if (day === null) return <div key={i} />;
+          const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const isToday = dateStr === todayStr;
+          const isPast = dateStr < todayStr;
+          return (
+            <button
+              key={i}
+              onClick={() => onSelect(dateStr)}
+              disabled={isPast}
+              style={{
+                width: 28, height: 28, borderRadius: 6, border: "none",
+                background: isToday ? "rgba(99,102,241,0.25)" : "transparent",
+                color: isPast ? "#334155" : isToday ? "#a5b4fc" : "#e2e8f0",
+                fontSize: 11, fontWeight: isToday ? 700 : 400,
+                cursor: isPast ? "default" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "background 0.1s",
+              }}
+              onMouseEnter={e => { if (!isPast) e.currentTarget.style.background = "rgba(99,102,241,0.15)"; }}
+              onMouseLeave={e => { if (!isPast) e.currentTarget.style.background = isToday ? "rgba(99,102,241,0.25)" : "transparent"; }}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Meeting Todos Panel ───────────────────────────────────────────────────────
-function MeetingTodosPanel({ currentUser }) {
+function MeetingTodosPanel({ currentUser, onAddToNotes, initialDealKey, onNavConsumed }) {
   const [ffToken, setFfToken] = useState(() => getFirefliesToken());
   const [inputToken, setInputToken] = useState("");
   const [transcripts, setTranscripts] = useState(null);
@@ -600,10 +703,21 @@ function MeetingTodosPanel({ currentUser }) {
   const [deals, setDeals] = useState([]);
   const [checked, setChecked] = useState({});
   const [meetingLinks, setMeetingLinks] = useState({}); // { transcriptId: dealId | "__none__" }
-  const [collapsed, setCollapsed] = useState({});
+  const [followUps, setFollowUps] = useState({}); // { key: { date, dealName, dealId, todoText } }
+  const [collapsed, setCollapsed] = useState(() => initialDealKey ? { [initialDealKey]: false } : {});
   const [lastSync, setLastSync] = useState(null);
+  const [schedulingKey, setSchedulingKey] = useState(null); // which action item is being scheduled
   const docRef = useRef(null);
   const didAutoSync = useRef(false);
+  const dealScrollRef = useRef(null);
+
+  // Scroll to the deep-linked deal group once transcripts load
+  useEffect(() => {
+    if (initialDealKey && transcripts && dealScrollRef.current) {
+      dealScrollRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (onNavConsumed) onNavConsumed();
+    }
+  }, [initialDealKey, transcripts, onNavConsumed]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -613,6 +727,7 @@ function MeetingTodosPanel({ currentUser }) {
       if (snap.exists()) {
         setChecked(snap.data().meetingChecked || {});
         setMeetingLinks(snap.data().meetingDealLinks || {});
+        setFollowUps(snap.data().followUps || {});
       }
     });
 
@@ -683,6 +798,25 @@ function MeetingTodosPanel({ currentUser }) {
       if (dealId === undefined) delete next[transcriptId]; // revert to auto
       else next[transcriptId] = dealId;
       setDoc(docRef.current, { meetingDealLinks: next }, { merge: true }).catch(() => {});
+      return next;
+    });
+  }
+
+  function saveFollowUp(key, date, dealName, dealId, todoText) {
+    setFollowUps(prev => {
+      const next = { ...prev, [key]: { date, dealName: dealName || null, dealId: dealId || null, todoText } };
+      if (docRef.current) setDoc(docRef.current, { followUps: next }, { merge: true }).catch(() => {});
+      return next;
+    });
+    setSchedulingKey(null);
+    setScheduleDate("");
+  }
+
+  function removeFollowUp(key) {
+    setFollowUps(prev => {
+      const next = { ...prev };
+      delete next[key];
+      if (docRef.current) setDoc(docRef.current, { followUps: next }, { merge: true }).catch(() => {});
       return next;
     });
   }
@@ -897,7 +1031,7 @@ function MeetingTodosPanel({ currentUser }) {
             s + item.actionItems.filter((_, idx) => !!checked[`${item.transcript.id}_${idx}`]).length, 0);
 
           return (
-            <div key={group.key} style={{ marginBottom: 18 }}>
+            <div key={group.key} ref={group.key === initialDealKey ? dealScrollRef : undefined} style={{ marginBottom: 18 }}>
               {/* Group header */}
               <button
                 onClick={() => setCollapsed(c => ({ ...c, [group.key]: c[group.key] === false }))}
@@ -997,6 +1131,10 @@ function MeetingTodosPanel({ currentUser }) {
                         {item.actionItems.map((todo, idx) => {
                           const key = `${item.transcript.id}_${idx}`;
                           const isDone = !!checked[key];
+                          const fu = followUps[key];
+                          const isScheduling = schedulingKey === key;
+                          const dealName = item.linked?.name || null;
+                          const dealId = item.linked?.id || null;
                           return (
                             <div
                               key={key}
@@ -1022,14 +1160,79 @@ function MeetingTodosPanel({ currentUser }) {
                                   </svg>
                                 )}
                               </button>
-                              <span style={{
-                                fontSize: 13, color: isDone ? "#475569" : "#e2e8f0",
-                                fontFamily: "'DM Sans',sans-serif", lineHeight: 1.55,
-                                textDecoration: isDone ? "line-through" : "none",
-                                transition: "color 0.15s",
-                              }}>
-                                {todo}
-                              </span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{
+                                  fontSize: 13, color: isDone ? "#475569" : "#e2e8f0",
+                                  fontFamily: "'DM Sans',sans-serif", lineHeight: 1.55,
+                                  textDecoration: isDone ? "line-through" : "none",
+                                  transition: "color 0.15s",
+                                }}>
+                                  {todo}
+                                </span>
+                                {/* Follow-up label */}
+                                {fu && (
+                                  <span style={{
+                                    display: "inline-block", marginLeft: 8, fontSize: 10,
+                                    background: "rgba(99,102,241,0.15)", color: "#a5b4fc",
+                                    borderRadius: 4, padding: "2px 7px", fontFamily: "'DM Mono',monospace",
+                                    verticalAlign: "middle",
+                                  }}>
+                                    Follow-up {new Date(fu.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                    <button
+                                      onClick={() => removeFollowUp(key)}
+                                      style={{
+                                        background: "none", border: "none", color: "#6366f1",
+                                        cursor: "pointer", padding: "0 0 0 4px", fontSize: 10, lineHeight: 1,
+                                      }}
+                                      title="Remove follow-up"
+                                    >×</button>
+                                  </span>
+                                )}
+                                {/* Action buttons row */}
+                                <div style={{ display: "flex", gap: 6, marginTop: 5 }}>
+                                  <button
+                                    onClick={() => {
+                                      if (onAddToNotes) onAddToNotes(todo, dealName);
+                                    }}
+                                    title="Add to Notes as a todo"
+                                    style={{
+                                      background: "transparent", border: "1px solid #1e3a5f",
+                                      borderRadius: 5, padding: "3px 8px", color: "#64748b",
+                                      fontSize: 10, fontFamily: "'DM Sans',sans-serif",
+                                      cursor: "pointer", transition: "all 0.15s",
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#6366f1"; e.currentTarget.style.color = "#a5b4fc"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#1e3a5f"; e.currentTarget.style.color = "#64748b"; }}
+                                  >
+                                    + Add to Notes
+                                  </button>
+                                  {!fu && (
+                                    <button
+                                      onClick={() => { setSchedulingKey(isScheduling ? null : key); }}
+                                      title="Schedule a follow-up"
+                                      style={{
+                                        background: "transparent", border: "1px solid #1e3a5f",
+                                        borderRadius: 5, padding: "3px 8px", color: "#64748b",
+                                        fontSize: 10, fontFamily: "'DM Sans',sans-serif",
+                                        cursor: "pointer", transition: "all 0.15s",
+                                      }}
+                                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#6366f1"; e.currentTarget.style.color = "#a5b4fc"; }}
+                                      onMouseLeave={e => { e.currentTarget.style.borderColor = "#1e3a5f"; e.currentTarget.style.color = "#64748b"; }}
+                                    >
+                                      Schedule Follow-up
+                                    </button>
+                                  )}
+                                </div>
+                                {/* Mini calendar picker */}
+                                {isScheduling && (
+                                  <div style={{ position: "relative", marginTop: 6 }}>
+                                    <MiniCalendarPicker
+                                      onSelect={(dateStr) => saveFollowUp(key, dateStr, dealName, dealId, todo)}
+                                      onClose={() => { setSchedulingKey(null); }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -1187,8 +1390,8 @@ function MeetingTodosPanel({ currentUser }) {
 }
 
 // ── Main TodosPage ─────────────────────────────────────────────────────────────
-export default function TodosPage({ currentUser }) {
-  const [activeTab, setActiveTab] = useState("notes");
+export default function TodosPage({ currentUser, initialNav, onNavConsumed }) {
+  const [activeTab, setActiveTab] = useState(initialNav?.tab || "notes");
   const [blocks, setBlocks] = useState([newBlock()]);
   const [title, setTitle] = useState("");
   const [titleEmpty, setTitleEmpty] = useState(true);
@@ -1391,6 +1594,29 @@ export default function TodosPage({ currentUser }) {
     return () => document.removeEventListener("mousedown", onDown);
   }, [slashState]);
 
+  // Follow-ups state (for calendar tab)
+  const [followUps, setFollowUps] = useState({});
+  useEffect(() => {
+    if (!currentUser) return;
+    const ref = doc(db, "userNotes", currentUser.uid);
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) setFollowUps(snap.data().followUps || {});
+    });
+    return unsub;
+  }, [currentUser]);
+
+  function handleAddToNotes(todoText, dealName) {
+    const nb = newBlock("todo");
+    nb.content = todoText;
+    nb.dealName = dealName || null;
+    setBlocks(prev => {
+      const next = [...prev, nb];
+      scheduleSave(next, currentTitle.current);
+      return next;
+    });
+    setActiveTab("notes");
+  }
+
   if (!loaded) {
     return (
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
@@ -1402,6 +1628,7 @@ export default function TodosPage({ currentUser }) {
   const tabs = [
     { id: "notes", label: "Notes" },
     { id: "meetings", label: "Meeting Todos" },
+    { id: "followups", label: "Follow Up Schedule" },
   ];
 
   return (
@@ -1522,7 +1749,12 @@ export default function TodosPage({ currentUser }) {
 
       {/* Meeting Todos tab */}
       {activeTab === "meetings" && (
-        <MeetingTodosPanel currentUser={currentUser} />
+        <MeetingTodosPanel currentUser={currentUser} onAddToNotes={handleAddToNotes} initialDealKey={initialNav?.dealKey} onNavConsumed={onNavConsumed} />
+      )}
+
+      {/* Follow Up Schedule tab */}
+      {activeTab === "followups" && (
+        <FollowUpCalendar followUps={followUps} currentUser={currentUser} />
       )}
 
       {/* Save status (notes tab only) */}
@@ -1536,6 +1768,248 @@ export default function TodosPage({ currentUser }) {
           {saving ? "Saving…" : "All saved"}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Follow Up Calendar ────────────────────────────────────────────────────────
+function FollowUpCalendar({ followUps, currentUser }) {
+  const [viewDate, setViewDate] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+
+  function toggleComplete(key) {
+    if (!currentUser) return;
+    const fu = followUps[key];
+    if (!fu) return;
+    const next = { ...followUps, [key]: { ...fu, completed: !fu.completed } };
+    setDoc(doc(db, "userNotes", currentUser.uid), { followUps: next }, { merge: true }).catch(() => {});
+  }
+
+  const entries = Object.entries(followUps || {}).map(([key, fu]) => ({
+    key,
+    date: fu.date,
+    dealName: fu.dealName || "No deal",
+    todoText: fu.todoText || "",
+    completed: !!fu.completed,
+  }));
+
+  const year = viewDate.year;
+  const month = viewDate.month;
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = new Date(year, month).toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  // Build grid: 6 weeks × 7 days
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const dayNum = i - firstDay + 1;
+    if (dayNum < 1 || dayNum > daysInMonth) {
+      cells.push(null);
+    } else {
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+      const dayEntries = entries.filter(e => e.date === dateStr);
+      cells.push({ dayNum, dateStr, entries: dayEntries });
+    }
+  }
+
+  const prevMonth = () => setViewDate(v => {
+    const m = v.month === 0 ? 11 : v.month - 1;
+    return { year: v.month === 0 ? v.year - 1 : v.year, month: m };
+  });
+  const nextMonth = () => setViewDate(v => {
+    const m = v.month === 11 ? 0 : v.month + 1;
+    return { year: v.month === 11 ? v.year + 1 : v.year, month: m };
+  });
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // Upcoming follow-ups (sorted)
+  const upcoming = entries
+    .filter(e => e.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Deal color palette
+  const dealColors = {};
+  const palette = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+  let colorIdx = 0;
+  entries.forEach(e => {
+    if (!dealColors[e.dealName]) {
+      dealColors[e.dealName] = palette[colorIdx % palette.length];
+      colorIdx++;
+    }
+  });
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "52px 80px 240px" }}>
+
+        {/* Header */}
+        <h1 style={{
+          fontSize: 38, fontWeight: 800, color: "#f1f5f9",
+          fontFamily: "'DM Sans',sans-serif", margin: "0 0 32px",
+        }}>
+          Follow Up Schedule
+        </h1>
+
+        {entries.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}>
+            No follow-ups scheduled yet. Schedule one from the Meeting Todos tab.
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 32 }}>
+
+            {/* Calendar grid */}
+            <div style={{ flex: 1 }}>
+              {/* Month nav */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <button onClick={prevMonth} style={{
+                  background: "#1e293b", border: "1px solid #334155", borderRadius: 6,
+                  padding: "5px 10px", color: "#e2e8f0", fontSize: 14, cursor: "pointer",
+                }}>‹</button>
+                <span style={{
+                  flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700,
+                  color: "#f1f5f9", fontFamily: "'DM Sans',sans-serif",
+                }}>
+                  {monthName}
+                </span>
+                <button onClick={nextMonth} style={{
+                  background: "#1e293b", border: "1px solid #334155", borderRadius: 6,
+                  padding: "5px 10px", color: "#e2e8f0", fontSize: 14, cursor: "pointer",
+                }}>›</button>
+              </div>
+
+              {/* Day-of-week headers */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, marginBottom: 4 }}>
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+                  <div key={d} style={{
+                    textAlign: "center", fontSize: 10, color: "#475569",
+                    fontFamily: "'DM Mono',monospace", padding: "4px 0",
+                    textTransform: "uppercase", letterSpacing: "0.08em",
+                  }}>{d}</div>
+                ))}
+              </div>
+
+              {/* Calendar cells */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1 }}>
+                {cells.map((cell, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      minHeight: 72, padding: 4,
+                      background: cell ? (cell.dateStr === todayStr ? "rgba(99,102,241,0.08)" : "#0f172a") : "transparent",
+                      border: cell ? `1px solid ${cell.dateStr === todayStr ? "rgba(99,102,241,0.3)" : "#1e293b"}` : "none",
+                      borderRadius: 6,
+                    }}
+                  >
+                    {cell && (
+                      <>
+                        <div style={{
+                          fontSize: 11, fontWeight: cell.dateStr === todayStr ? 700 : 400,
+                          color: cell.dateStr === todayStr ? "#a5b4fc" : "#64748b",
+                          fontFamily: "'DM Mono',monospace", marginBottom: 2,
+                        }}>
+                          {cell.dayNum}
+                        </div>
+                        {cell.entries.map((e, j) => (
+                          <div
+                            key={j}
+                            title={`${e.dealName}: ${e.todoText}`}
+                            onClick={() => toggleComplete(e.key)}
+                            style={{
+                              fontSize: 9, padding: "2px 4px", marginBottom: 2,
+                              background: e.completed ? "rgba(74,222,128,0.08)" : `${dealColors[e.dealName]}22`,
+                              borderLeft: `2px solid ${e.completed ? "#4ade80" : dealColors[e.dealName]}`,
+                              borderRadius: 3, color: e.completed ? "#64748b" : "#e2e8f0",
+                              fontFamily: "'DM Sans',sans-serif",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              cursor: "pointer", textDecoration: e.completed ? "line-through" : "none",
+                            }}
+                          >
+                            {e.dealName}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Upcoming sidebar */}
+            <div style={{ width: 260, flexShrink: 0 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: "#94a3b8",
+                fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase",
+                letterSpacing: "0.08em", marginBottom: 12,
+              }}>
+                Upcoming
+              </div>
+              {upcoming.length === 0 && (
+                <div style={{ fontSize: 12, color: "#475569", fontFamily: "'DM Sans',sans-serif" }}>
+                  No upcoming follow-ups.
+                </div>
+              )}
+              {upcoming.map(e => {
+                const d = new Date(e.date + "T00:00:00");
+                const dateLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                return (
+                  <div
+                    key={e.key}
+                    style={{
+                      background: "#1e293b", border: "1px solid #334155",
+                      borderRadius: 8, padding: "10px 12px", marginBottom: 8,
+                      borderLeft: `3px solid ${e.completed ? "#4ade80" : (dealColors[e.dealName] || "#6366f1")}`,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <button
+                        onClick={() => toggleComplete(e.key)}
+                        style={{
+                          width: 15, height: 15, borderRadius: 3, flexShrink: 0,
+                          background: e.completed ? "#4ade80" : "transparent",
+                          border: `1.5px solid ${e.completed ? "#4ade80" : "#475569"}`,
+                          cursor: "pointer", display: "flex", alignItems: "center",
+                          justifyContent: "center", transition: "all 0.15s", padding: 0,
+                        }}
+                      >
+                        {e.completed && (
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5.5L4 7.5L8 3" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                      <span style={{
+                        fontSize: 10, color: "#64748b", fontFamily: "'DM Mono',monospace",
+                      }}>
+                        {dateLabel}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: 12, fontWeight: 600,
+                      color: e.completed ? "#64748b" : (dealColors[e.dealName] || "#a5b4fc"),
+                      fontFamily: "'DM Sans',sans-serif", marginBottom: 3,
+                      textDecoration: e.completed ? "line-through" : "none",
+                    }}>
+                      {e.dealName}
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: e.completed ? "#475569" : "#e2e8f0",
+                      fontFamily: "'DM Sans',sans-serif", lineHeight: 1.5,
+                      textDecoration: e.completed ? "line-through" : "none",
+                    }}>
+                      {e.todoText}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+        )}
+      </div>
     </div>
   );
 }
