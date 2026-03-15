@@ -33,6 +33,15 @@ async function hsPatch(token, path, body) {
   if (!res.ok) throw new Error(`HubSpot PATCH error (${res.status})`);
   return res.json();
 }
+async function hsPost(token, path, body) {
+  const res = await fetch(`https://api.hubapi.com${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HubSpot POST error (${res.status})`);
+  return res.json();
+}
 
 // ─── Tool definitions (Claude format) ───────────────────────────────────────
 const TOOLS = [
@@ -67,9 +76,26 @@ const TOOLS = [
     },
   },
   {
+    name: "delete_deal",
+    description: "Delete a pipeline deal by its Firestore document ID.",
+    input_schema: { type: "object", properties: { dealId: { type: "string" } }, required: ["dealId"] },
+  },
+  {
     name: "list_events",
     description: "List all conference/event entries.",
     input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "create_event",
+    description: "Create a new conference/event entry.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD" },
+        peopleMet: { type: "number" }, convertedToMeeting: { type: "number" },
+      },
+      required: ["name", "date"],
+    },
   },
   {
     name: "list_outbound",
@@ -77,9 +103,56 @@ const TOOLS = [
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "create_outbound",
+    description: "Log a new weekly outbound activity entry.",
+    input_schema: {
+      type: "object",
+      properties: {
+        weekOf: { type: "string", description: "YYYY-MM-DD (Monday of the week)" },
+        touches: { type: "number" }, bookings: { type: "number" },
+        held: { type: "number" }, deals: { type: "number" },
+      },
+      required: ["weekOf"],
+    },
+  },
+  {
     name: "read_notes",
     description: "Read the user's notes and todos.",
     input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "update_notes",
+    description: "Update the user's notes blocks. Provide the full blocks array or specific fields to merge.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Notes document title" },
+        blocks: { type: "array", description: "Array of block objects: {id, type, content, checked}", items: { type: "object" } },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "add_follow_up",
+    description: "Schedule a follow-up reminder for a deal.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dealId: { type: "string" }, dealName: { type: "string" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        todoText: { type: "string", description: "What to follow up on" },
+      },
+      required: ["dealName", "date", "todoText"],
+    },
+  },
+  {
+    name: "complete_follow_up",
+    description: "Mark a follow-up as completed.",
+    input_schema: {
+      type: "object",
+      properties: { followUpKey: { type: "string", description: "The key of the follow-up in the followUps object" } },
+      required: ["followUpKey"],
+    },
   },
   {
     name: "search_hubspot_deals",
@@ -91,13 +164,31 @@ const TOOLS = [
     },
   },
   {
+    name: "get_deal_contacts",
+    description: "Get contacts associated with a HubSpot deal.",
+    input_schema: {
+      type: "object",
+      properties: { hubspotDealId: { type: "string", description: "HubSpot deal ID" } },
+      required: ["hubspotDealId"],
+    },
+  },
+  {
+    name: "get_deal_notes",
+    description: "Get notes associated with a HubSpot deal.",
+    input_schema: {
+      type: "object",
+      properties: { hubspotDealId: { type: "string", description: "HubSpot deal ID" } },
+      required: ["hubspotDealId"],
+    },
+  },
+  {
     name: "sync_hubspot",
     description: "Sync new deals from HubSpot into the pipeline tracker.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
 ];
 
-// ─── Tool execution (subset — voice calls don't need all tools) ─────────────
+// ─── Tool execution ─────────────────────────────────────────────────────────
 async function executeTool(name, input, ctx) {
   const db = getDb();
   const { userId, hsToken } = ctx;
@@ -107,7 +198,7 @@ async function executeTool(name, input, ctx) {
       const snap = await db.collection("pipelineDeals").get();
       let deals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (input.bucket) deals = deals.filter(d => d.bucket === input.bucket);
-      return { deals: deals.map(d => ({ id: d.id, name: d.name, value: d.value, bucket: d.bucket, expectedCloseMonth: d.expectedCloseMonth, confidence: d.manualConfidence ?? d.confidence, closedWon: d.closedWon || false, notes: d.notes, funnelType: d.funnelType })) };
+      return { deals: deals.map(d => ({ id: d.id, name: d.name, value: d.value, bucket: d.bucket, expectedCloseMonth: d.expectedCloseMonth, confidence: d.manualConfidence ?? d.confidence, closedWon: d.closedWon || false, notes: d.notes, hubspotId: d.hubspotId, funnelType: d.funnelType, meetingBooked: d.meetingBooked, lastActivityDate: d.lastActivityDate })) };
     }
     case "update_deal": {
       const ref = db.collection("pipelineDeals").doc(input.dealId);
@@ -127,44 +218,123 @@ async function executeTool(name, input, ctx) {
     }
     case "create_deal": {
       const ref = await db.collection("pipelineDeals").add({
-        source: "manual", name: input.name, value: input.value,
+        source: "bob", name: input.name, value: input.value || 0,
         bucket: input.bucket || "untagged", expectedCloseMonth: input.expectedCloseMonth || "",
         notes: input.notes || "", funnelType: input.funnelType || "outbound",
-        manualConfidence: 30, closedWon: false, meetingBooked: false,
+        manualConfidence: 30, useAlgoConfidence: false, closedWon: false, meetingBooked: false,
+        hubspotId: null, funnelEventId: null, lastActivityDate: null, touchCount: 0,
+        hubspotStage: null, hubspotPipeline: null, hubspotStageProbability: null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       return { success: true, dealId: ref.id };
     }
+    case "delete_deal": {
+      await db.collection("pipelineDeals").doc(input.dealId).delete();
+      return { success: true };
+    }
     case "list_events": {
       const snap = await db.collection("pipelineEvents").get();
       return { events: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
+    }
+    case "create_event": {
+      const ref = await db.collection("pipelineEvents").add({
+        name: input.name, date: input.date,
+        peopleMet: input.peopleMet || 0, convertedToMeeting: input.convertedToMeeting || 0,
+        dealsWon: 0, dealValue: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { success: true, eventId: ref.id };
     }
     case "list_outbound": {
       const snap = await db.collection("outboundActuals").get();
       return { entries: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
     }
+    case "create_outbound": {
+      const ref = await db.collection("outboundActuals").add({
+        weekOf: input.weekOf, touches: input.touches || 0,
+        bookings: input.bookings || 0, held: input.held || 0, deals: input.deals || 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { success: true, entryId: ref.id };
+    }
     case "read_notes": {
       if (!userId) return { error: "No userId" };
       const snap = await db.collection("userNotes").doc(userId).get();
-      return snap.exists ? snap.data() : { title: "", blocks: [] };
+      if (!snap.exists) return { notes: null };
+      const data = snap.data();
+      return { title: data.title, blocks: data.blocks, followUps: data.followUps, meetingChecked: data.meetingChecked };
+    }
+    case "update_notes": {
+      if (!userId) return { error: "No userId" };
+      const updates = { updatedAt: Date.now() };
+      if (input.title !== undefined) updates.title = input.title;
+      if (input.blocks !== undefined) updates.blocks = input.blocks;
+      await db.collection("userNotes").doc(userId).set(updates, { merge: true });
+      return { success: true };
+    }
+    case "add_follow_up": {
+      if (!userId) return { error: "No userId" };
+      const snap = await db.collection("userNotes").doc(userId).get();
+      const followUps = snap.exists ? (snap.data().followUps || {}) : {};
+      const key = `${input.dealName.replace(/\s+/g, "_")}_${Date.now()}`;
+      followUps[key] = {
+        dealId: input.dealId || null, dealName: input.dealName,
+        date: input.date, todoText: input.todoText, completed: false,
+      };
+      await db.collection("userNotes").doc(userId).set({ followUps }, { merge: true });
+      return { success: true, followUpKey: key };
+    }
+    case "complete_follow_up": {
+      if (!userId) return { error: "No userId" };
+      const snap = await db.collection("userNotes").doc(userId).get();
+      if (!snap.exists) return { error: "No notes document found" };
+      const followUps = snap.data().followUps || {};
+      if (!followUps[input.followUpKey]) return { error: "Follow-up not found" };
+      followUps[input.followUpKey].completed = true;
+      await db.collection("userNotes").doc(userId).set({ followUps }, { merge: true });
+      return { success: true };
     }
     case "search_hubspot_deals": {
       if (!hsToken) return { error: "No HubSpot token" };
-      const data = await fetch(`https://api.hubapi.com/crm/v3/objects/deals/search`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${hsToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filterGroups: [{ filters: [{ propertyName: "dealname", operator: "CONTAINS_TOKEN", value: input.searchTerm }] }],
-          properties: ["dealname", "amount", "dealstage", "closedate"],
-          limit: 10,
-        }),
-      }).then(r => r.json());
-      return { deals: (data.results || []).map(d => d.properties) };
+      const props = ["dealname", "amount", "closedate", "dealstage", "pipeline", "hs_deal_stage_probability"];
+      let allDeals = [], after;
+      do {
+        const params = new URLSearchParams({ properties: props.join(","), limit: "100" });
+        if (after) params.set("after", after);
+        const data = await hsGet(hsToken, `/crm/v3/objects/deals?${params}`);
+        allDeals = [...allDeals, ...data.results];
+        after = data.paging?.next?.after;
+      } while (after);
+      const term = input.searchTerm.toLowerCase();
+      const filtered = allDeals.filter(d => (d.properties?.dealname || "").toLowerCase().includes(term));
+      return { deals: filtered.slice(0, 20).map(d => ({ id: d.id, name: d.properties.dealname, amount: d.properties.amount, stage: d.properties.dealstage, pipeline: d.properties.pipeline, closedate: d.properties.closedate })) };
+    }
+    case "get_deal_contacts": {
+      if (!hsToken) return { error: "No HubSpot token" };
+      const assoc = await hsGet(hsToken, `/crm/v3/objects/deals/${input.hubspotDealId}/associations/contacts`);
+      const ids = (assoc.results ?? []).map(r => r.id);
+      if (ids.length === 0) return { contacts: [] };
+      const data = await hsPost(hsToken, "/crm/v3/objects/contacts/batch/read", {
+        properties: ["firstname", "lastname", "email", "phone", "jobtitle"],
+        inputs: ids.map(id => ({ id })),
+      });
+      return { contacts: (data.results ?? []).map(c => c.properties) };
+    }
+    case "get_deal_notes": {
+      if (!hsToken) return { error: "No HubSpot token" };
+      const assoc = await hsGet(hsToken, `/crm/v3/objects/deals/${input.hubspotDealId}/associations/notes`);
+      const ids = (assoc.results ?? []).map(r => r.id);
+      if (ids.length === 0) return { notes: [] };
+      const data = await hsPost(hsToken, "/crm/v3/objects/notes/batch/read", {
+        properties: ["hs_note_body", "hs_timestamp", "hs_lastmodifieddate"],
+        inputs: ids.map(id => ({ id })),
+      });
+      return { notes: (data.results ?? []).map(n => n.properties) };
     }
     case "sync_hubspot": {
       if (!hsToken) return { error: "No HubSpot token" };
-      const props = ["dealname", "amount", "closedate", "dealstage", "pipeline"];
+      const props = ["dealname", "amount", "closedate", "dealstage", "pipeline", "hs_deal_stage_probability"];
       let allDeals = [], after;
       do {
         const params = new URLSearchParams({ properties: props.join(","), limit: "100" });
@@ -183,14 +353,19 @@ async function executeTool(name, input, ctx) {
           source: "hubspot", hubspotId: d.id,
           name: d.properties.dealname || "Unnamed", value: parseFloat(d.properties.amount) || 0,
           bucket: "untagged", expectedCloseMonth: d.properties.closedate ? d.properties.closedate.slice(0, 7) : "",
-          manualConfidence: 30, closedWon: d.properties.dealstage === "closedwon",
-          funnelType: "outbound", createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          manualConfidence: 30, useAlgoConfidence: true, closedWon: d.properties.dealstage === "closedwon",
+          funnelType: "outbound", funnelEventId: null, meetingBooked: false,
+          lastActivityDate: null, touchCount: 0, notes: "",
+          hubspotStage: d.properties.dealstage, hubspotPipeline: d.properties.pipeline,
+          hubspotStageProbability: parseFloat(d.properties.hs_deal_stage_probability) || null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         count++;
+        if (count % 500 === 0) { await batch.commit(); }
       }
-      if (count > 0) await batch.commit();
-      return { success: true, imported: count };
+      if (count % 500 !== 0) await batch.commit();
+      return { success: true, imported: count, total: allDeals.length };
     }
     default:
       return { error: `Unknown tool: ${name}` };
