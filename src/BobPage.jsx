@@ -216,6 +216,8 @@ export default function BobPage({ currentUser, hsToken }) {
   const streamingTextRef = useRef("");
   const activeConvIdRef = useRef(null);
 
+  const [fsError, setFsError] = useState(null);
+
   // Load conversations list
   useEffect(() => {
     if (!currentUser) return;
@@ -223,19 +225,23 @@ export default function BobPage({ currentUser, hsToken }) {
       collection(db, "bobConversations"),
       where("userId", "==", currentUser.uid)
     );
-    // Try realtime listener first
     const unsub = onSnapshot(q, snap => {
       const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       convs.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
       setConversations(convs);
+      setFsError(null);
     }, err => {
       console.error("bobConversations onSnapshot error:", err);
-      // Fallback: one-time fetch if realtime listener fails
+      setFsError("onSnapshot: " + err.message);
       getDocs(q).then(snap => {
         const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         convs.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
         setConversations(convs);
-      }).catch(e => console.error("bobConversations getDocs fallback error:", e));
+        setFsError(null);
+      }).catch(e => {
+        console.error("bobConversations getDocs fallback error:", e);
+        setFsError("getDocs: " + e.message);
+      });
     });
     return unsub;
   }, [currentUser]);
@@ -356,6 +362,7 @@ export default function BobPage({ currentUser, hsToken }) {
         });
       } catch (e) {
         console.error("Conversation create error:", e);
+        setFsError("addDoc: " + e.message);
         // Firestore write failed — add to local state directly as fallback
         const localId = "local_" + Date.now();
         convId = localId;
@@ -606,6 +613,14 @@ export default function BobPage({ currentUser, hsToken }) {
 
       {/* Main chat area */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        {fsError && (
+          <div style={{
+            padding: "8px 16px", background: "#7f1d1d", color: "#fca5a5",
+            fontSize: 11, fontFamily: "'DM Mono',monospace",
+          }}>
+            Firestore error: {fsError}
+          </div>
+        )}
         {/* Chat header */}
         <div style={{
           padding: "12px 16px", borderBottom: "1px solid var(--border)",
