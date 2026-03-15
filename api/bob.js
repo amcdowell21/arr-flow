@@ -504,6 +504,8 @@ Data model context:
 - Follow-ups are date-based reminders linked to deals
 - Notes use a block editor with types: text, h1, h2, h3, bullet, numbered, todo, quote, code, divider
 
+IMPORTANT: When mentioning any date, you MUST look up the day-of-week from the calendar above. Do NOT compute or guess which day a date falls on — always reference the calendar. For example, if March 17 is listed as Tuesday in the calendar, say "Tuesday March 17", never "Monday March 17".
+
 Be concise and action-oriented. When you make changes, confirm what you did. Use markdown formatting for readability. When listing deals, format them in a clear table or list.`;
 }
 
