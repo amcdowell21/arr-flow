@@ -1774,6 +1774,8 @@ export default function TodosPage({ currentUser, initialNav, onNavConsumed }) {
 
 // ── Follow Up Calendar ────────────────────────────────────────────────────────
 function FollowUpCalendar({ followUps, currentUser }) {
+  const [calView, setCalView] = useState("week"); // "week" or "month"
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = next week, -1 = this week's past, +1 = week after next, etc.
   const [viewDate, setViewDate] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -1795,13 +1797,55 @@ function FollowUpCalendar({ followUps, currentUser }) {
     completed: !!fu.completed,
   }));
 
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // Deal color palette
+  const dealColors = {};
+  const palette = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+  let colorIdx = 0;
+  entries.forEach(e => {
+    if (!dealColors[e.dealName]) {
+      dealColors[e.dealName] = palette[colorIdx % palette.length];
+      colorIdx++;
+    }
+  });
+
+  // ── Week view helpers ──
+  function getNextMonday(fromDate, offset) {
+    const d = new Date(fromDate);
+    const day = d.getDay(); // 0=Sun
+    const daysUntilNextMon = day === 0 ? 1 : (8 - day);
+    d.setDate(d.getDate() + daysUntilNextMon + (offset * 7));
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  const weekMonday = getNextMonday(today, weekOffset);
+  const weekDays = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(weekMonday);
+    d.setDate(weekMonday.getDate() + i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const dayEntries = entries.filter(e => e.date === dateStr);
+    weekDays.push({
+      date: d,
+      dateStr,
+      dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
+      dayNum: d.getDate(),
+      monthShort: d.toLocaleDateString("en-US", { month: "short" }),
+      entries: dayEntries,
+    });
+  }
+  const weekLabel = `${weekDays[0].monthShort} ${weekDays[0].dayNum} – ${weekDays[4].monthShort} ${weekDays[4].dayNum}`;
+
+  // ── Month view helpers ──
   const year = viewDate.year;
   const month = viewDate.month;
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const monthName = new Date(year, month).toLocaleString("en-US", { month: "long", year: "numeric" });
 
-  // Build grid: 6 weeks × 7 days
   const cells = [];
   for (let i = 0; i < 42; i++) {
     const dayNum = i - firstDay + 1;
@@ -1823,45 +1867,145 @@ function FollowUpCalendar({ followUps, currentUser }) {
     return { year: v.month === 11 ? v.year + 1 : v.year, month: m };
   });
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
-  // Upcoming follow-ups (sorted)
-  const upcoming = entries
-    .filter(e => e.date >= todayStr)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  // Deal color palette
-  const dealColors = {};
-  const palette = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
-  let colorIdx = 0;
-  entries.forEach(e => {
-    if (!dealColors[e.dealName]) {
-      dealColors[e.dealName] = palette[colorIdx % palette.length];
-      colorIdx++;
-    }
-  });
-
   return (
     <div style={{ flex: 1, overflowY: "auto" }}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "52px 80px 240px" }}>
 
-        {/* Header */}
-        <h1 style={{
-          fontSize: 38, fontWeight: 800, color: "#f1f5f9",
-          fontFamily: "'DM Sans',sans-serif", margin: "0 0 32px",
-        }}>
-          Follow Up Schedule
-        </h1>
+        {/* Header + view toggle */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
+          <h1 style={{
+            fontSize: 38, fontWeight: 800, color: "#f1f5f9",
+            fontFamily: "'DM Sans',sans-serif", margin: 0,
+          }}>
+            Follow Up Schedule
+          </h1>
+          <div style={{ display: "flex", gap: 4, background: "#0f172a", borderRadius: 8, padding: 3, border: "1px solid #334155" }}>
+            <button
+              onClick={() => setCalView("week")}
+              style={{
+                padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+                background: calView === "week" ? "#6366f1" : "transparent",
+                color: calView === "week" ? "#fff" : "#94a3b8",
+                transition: "all 0.15s",
+              }}
+            >Week</button>
+            <button
+              onClick={() => setCalView("month")}
+              style={{
+                padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+                background: calView === "month" ? "#6366f1" : "transparent",
+                color: calView === "month" ? "#fff" : "#94a3b8",
+                transition: "all 0.15s",
+              }}
+            >Month</button>
+          </div>
+        </div>
 
         {entries.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: "#475569", fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}>
             No follow-ups scheduled yet. Schedule one from the Meeting Todos tab.
           </div>
-        ) : (
-          <div style={{ display: "flex", gap: 32 }}>
+        ) : calView === "week" ? (
+          /* ── WEEK VIEW ── */
+          <div>
+            {/* Week nav */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <button onClick={() => setWeekOffset(o => o - 1)} style={{
+                background: "#1e293b", border: "1px solid #334155", borderRadius: 6,
+                padding: "5px 10px", color: "#e2e8f0", fontSize: 14, cursor: "pointer",
+              }}>‹</button>
+              <span style={{
+                flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700,
+                color: "#f1f5f9", fontFamily: "'DM Sans',sans-serif",
+              }}>
+                {weekLabel}
+              </span>
+              <button onClick={() => setWeekOffset(o => o + 1)} style={{
+                background: "#1e293b", border: "1px solid #334155", borderRadius: 6,
+                padding: "5px 10px", color: "#e2e8f0", fontSize: 14, cursor: "pointer",
+              }}>›</button>
+            </div>
 
-            {/* Calendar grid */}
+            {/* 5-column day grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
+              {weekDays.map(wd => {
+                const isToday = wd.dateStr === todayStr;
+                return (
+                  <div key={wd.dateStr} style={{
+                    background: isToday ? "rgba(99,102,241,0.08)" : "#0f172a",
+                    border: `1px solid ${isToday ? "rgba(99,102,241,0.3)" : "#1e293b"}`,
+                    borderRadius: 10, padding: 14, minHeight: 180,
+                  }}>
+                    {/* Day header */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{
+                        fontSize: 11, fontWeight: 600, color: isToday ? "#a5b4fc" : "#64748b",
+                        fontFamily: "'DM Mono',monospace", textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                      }}>{wd.dayName}</div>
+                      <div style={{
+                        fontSize: 22, fontWeight: 700, color: isToday ? "#a5b4fc" : "#e2e8f0",
+                        fontFamily: "'DM Sans',sans-serif", lineHeight: 1.2,
+                      }}>{wd.dayNum}</div>
+                    </div>
+
+                    {/* Entries */}
+                    {wd.entries.length === 0 ? (
+                      <div style={{ fontSize: 11, color: "#334155", fontFamily: "'DM Sans',sans-serif", fontStyle: "italic" }}>
+                        No follow-ups
+                      </div>
+                    ) : wd.entries.map((e, j) => (
+                      <div
+                        key={j}
+                        onClick={() => toggleComplete(e.key)}
+                        style={{
+                          padding: "8px 10px", marginBottom: 8,
+                          background: e.completed ? "rgba(74,222,128,0.06)" : `${dealColors[e.dealName]}11`,
+                          borderLeft: `3px solid ${e.completed ? "#4ade80" : dealColors[e.dealName]}`,
+                          borderRadius: 6, cursor: "pointer",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                          <div style={{
+                            width: 13, height: 13, borderRadius: 3, flexShrink: 0,
+                            background: e.completed ? "#4ade80" : "transparent",
+                            border: `1.5px solid ${e.completed ? "#4ade80" : "#475569"}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            {e.completed && (
+                              <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                                <path d="M2 5.5L4 7.5L8 3" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </div>
+                          <span style={{
+                            fontSize: 11, fontWeight: 600,
+                            color: e.completed ? "#64748b" : (dealColors[e.dealName] || "#a5b4fc"),
+                            fontFamily: "'DM Sans',sans-serif",
+                            textDecoration: e.completed ? "line-through" : "none",
+                          }}>{e.dealName}</span>
+                        </div>
+                        {e.todoText && (
+                          <div style={{
+                            fontSize: 11, color: e.completed ? "#475569" : "#94a3b8",
+                            fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4,
+                            paddingLeft: 19,
+                            textDecoration: e.completed ? "line-through" : "none",
+                          }}>{e.todoText}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* ── MONTH VIEW ── */
+          <div style={{ display: "flex", gap: 32 }}>
             <div style={{ flex: 1 }}>
               {/* Month nav */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -1947,12 +2091,12 @@ function FollowUpCalendar({ followUps, currentUser }) {
               }}>
                 Upcoming
               </div>
-              {upcoming.length === 0 && (
+              {entries.filter(e => e.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date)).length === 0 && (
                 <div style={{ fontSize: 12, color: "#475569", fontFamily: "'DM Sans',sans-serif" }}>
                   No upcoming follow-ups.
                 </div>
               )}
-              {upcoming.map(e => {
+              {entries.filter(e => e.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date)).map(e => {
                 const d = new Date(e.date + "T00:00:00");
                 const dateLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
                 return (
@@ -2006,7 +2150,6 @@ function FollowUpCalendar({ followUps, currentUser }) {
                 );
               })}
             </div>
-
           </div>
         )}
       </div>
