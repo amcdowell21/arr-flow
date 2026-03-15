@@ -13,6 +13,7 @@ import LoginPage from "./LoginPage";
 import AdminPanel from "./AdminPanel";
 import TodosPage from "./TodosPage";
 import BobPage from "./BobPage";
+import BobFloat from "./BobFloat";
 
 const ADMIN_EMAIL = "admin@uniqlearn.co";
 
@@ -2188,6 +2189,7 @@ export default function ARRFlow() {
         )}
       </div>
       </div> {/* end scrollable content area */}
+      <BobFloat currentUser={currentUser} hsToken={hsToken} currentView={view} />
     </div>
     </ThemeProvider>
   );
