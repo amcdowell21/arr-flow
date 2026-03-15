@@ -393,49 +393,35 @@ export default function BobPage({ currentUser, hsToken }) {
     try {
       const { Conversation } = await import("@11labs/client");
 
-      // Build context from existing conversation for the agent prompt
-      let contextBlock = "";
-      if (messages.length > 0) {
-        contextBlock = "\n\nPrevious conversation context:\n" + messages
-          .slice(-6)
-          .map(m => `${m.role === "user" ? "User" : "Bob"}: ${m.content.slice(0, 200)}`)
-          .join("\n") + "\n\nContinue the conversation naturally.";
+      // Request mic permission before starting ElevenLabs session
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop());
+        console.log("[Bob Call] Mic permission granted");
+      } catch (micErr) {
+        console.error("[Bob Call] Mic permission denied:", micErr);
+        callActiveRef.current = false;
+        setInCall(false);
+        setCallPhase("idle");
+        return;
       }
-
-      const bobPrompt = `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help the user think through their pipeline, deals, outbound activity, and sales strategy.
-
-Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}.
-
-Keep responses SHORT and conversational — you're in a live voice call. Don't list things out unless asked. Be warm, natural, and action-oriented. Think of yourself as a smart sales ops buddy.
-
-The user sells to K-12 school districts. Their pipeline has buckets: active, future Q1/Q2, future Q3/Q4, renewal. They track outbound touches, meetings booked, events attended, and deal confidence.${contextBlock}`;
 
       const conversation = await Conversation.startSession({
         signedUrl,
-        overrides: {
-          agent: {
-            prompt: { prompt: bobPrompt },
-            firstMessage: messages.length > 0
-              ? "Hey, I'm here. What's on your mind?"
-              : "Hey! I'm Bob, your rev ops assistant. What can I help you with?",
-          },
-        },
         onConnect: () => {
           console.log("[Bob Call] ElevenLabs connected");
           setCallPhase("listening");
         },
-        onDisconnect: () => {
-          console.log("[Bob Call] ElevenLabs disconnected");
+        onDisconnect: (details) => {
+          console.log("[Bob Call] ElevenLabs disconnected, details:", JSON.stringify(details));
           if (callActiveRef.current) {
-            // Unexpected disconnect — end the call
             callActiveRef.current = false;
             setInCall(false);
             setCallPhase("idle");
           }
         },
         onMessage: (msg) => {
-          console.log("[Bob Call] Message:", msg);
-          // Handle transcription and agent messages
+          console.log("[Bob Call] Message:", JSON.stringify(msg));
           if (msg.source === "user" && msg.message) {
             callTranscriptRef.current = [...callTranscriptRef.current, { role: "user", content: msg.message, timestamp: Date.now() }];
             setCallTranscript([...callTranscriptRef.current]);
@@ -447,7 +433,10 @@ The user sells to K-12 school districts. Their pipeline has buckets: active, fut
           }
         },
         onError: (err) => {
-          console.error("[Bob Call] ElevenLabs error:", err);
+          console.error("[Bob Call] ElevenLabs error:", JSON.stringify(err));
+        },
+        onStatusChange: (status) => {
+          console.log("[Bob Call] Status:", status);
         },
         onModeChange: (mode) => {
           console.log("[Bob Call] Mode:", mode.mode);
@@ -458,6 +447,9 @@ The user sells to K-12 school districts. Their pipeline has buckets: active, fut
             setCallPhase("listening");
             setSpeaking(false);
           }
+        },
+        onDebug: (msg) => {
+          console.log("[Bob Call] Debug:", JSON.stringify(msg));
         },
       });
 
