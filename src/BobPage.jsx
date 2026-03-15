@@ -234,7 +234,6 @@ export default function BobPage({ currentUser, hsToken }) {
   const callTranscriptEndRef = useRef(null);
   const sendCallMessageRef = useRef(null);
   const startCallListeningRef = useRef(null);
-  const micLevelDecayRef = useRef(null);
   const [micLevel, setMicLevel] = useState(0);
 
   // ─── Speech Recognition setup ───────────────────────────────────────────
@@ -427,15 +426,40 @@ export default function BobPage({ currentUser, hsToken }) {
     });
   }, []);
 
-  // ─── Call mode: mic level monitor ─────────────────────────────────────
-  // NOTE: We do NOT call getUserMedia here — it conflicts with SpeechRecognition
-  // on many browsers, causing recognition to immediately die. Instead we drive
-  // the mic level visualizer from speech recognition activity (see onresult).
+  // ─── Call mode: mic stream ref (shared between monitor and recorder) ──
+  const micStreamRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animFrameRef = useRef(null);
+  const recorderRef = useRef(null);
+
   const startMicMonitor = useCallback(() => {
-    // No-op — mic level is now driven by speech recognition events
+    if (!micStreamRef.current) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = ctx.createMediaStreamSource(micStreamRef.current);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!analyserRef.current) return;
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
+        setMicLevel(avg);
+        animFrameRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (e) { console.warn("Mic monitor error:", e); }
   }, []);
 
   const stopMicMonitor = useCallback(() => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    analyserRef.current = null;
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
     setMicLevel(0);
   }, []);
 
@@ -546,119 +570,145 @@ export default function BobPage({ currentUser, hsToken }) {
   // Keep ref in sync
   useEffect(() => { sendCallMessageRef.current = sendCallMessage; }, [sendCallMessage]);
 
-  // ─── Call mode: start listening with silence detection ────────────────
+  // ─── Call mode: record and transcribe with Whisper ────────────────────
   const startCallListening = useCallback(() => {
-    if (!callActiveRef.current) return;
+    if (!callActiveRef.current || !micStreamRef.current) return;
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    // Don't abort previous — just null out the ref. Aborting kills the shared
-    // browser mic resource and causes the next instance to immediately die too.
-    callRecRef.current = null;
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = true;
-    recognition.continuous = false; // Non-continuous — restart manually after each utterance
-    recognition.maxAlternatives = 1;
-    callRecRef.current = recognition;
-
-    let finalTranscript = "";
-    let hasSpoken = false;
-    const startTime = Date.now();
-    let handledEnd = false; // Prevent double-restart from onerror + onend
+    // Use MediaRecorder to capture audio, then send to Whisper for transcription
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
+    const recorder = new MediaRecorder(micStreamRef.current, { mimeType });
+    recorderRef.current = recorder;
+    const chunks = [];
+    let hasSpeech = false;
 
     setCallPhase("listening");
+    setCallLiveText("");
+    console.log("[Bob Call] Recording started");
 
-    recognition.onresult = (event) => {
-      if (!callActiveRef.current) return;
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-          hasSpoken = true;
-        } else {
-          interim += event.results[i][0].transcript;
-          hasSpoken = true;
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunks.push(e.data);
+        hasSpeech = true;
+      }
+    };
+
+    recorder.onstop = async () => {
+      console.log("[Bob Call] Recording stopped, chunks:", chunks.length);
+      if (!hasSpeech || chunks.length === 0 || !callActiveRef.current) {
+        // No audio captured, restart listening
+        if (callActiveRef.current) {
+          setTimeout(() => startCallListeningRef.current(), 500);
+        }
+        return;
+      }
+
+      setCallPhase("processing");
+      setCallLiveText("Transcribing...");
+
+      try {
+        const blob = new Blob(chunks, { type: mimeType });
+        // Skip tiny recordings (< 1KB is likely silence)
+        if (blob.size < 1000) {
+          console.log("[Bob Call] Audio too small, skipping:", blob.size);
+          setCallLiveText("");
+          if (callActiveRef.current) {
+            setTimeout(() => startCallListeningRef.current(), 200);
+          }
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", blob, "audio.webm");
+        formData.append("model", "whisper-1");
+        formData.append("language", "en");
+
+        const res = await fetch("/api/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          console.error("[Bob Call] Transcribe error:", err);
+          setCallLiveText("");
+          if (callActiveRef.current) {
+            setTimeout(() => startCallListeningRef.current(), 1000);
+          }
+          return;
+        }
+
+        const { text } = await res.json();
+        console.log("[Bob Call] Whisper transcription:", text);
+
+        if (!text || !text.trim()) {
+          setCallLiveText("");
+          if (callActiveRef.current) {
+            setTimeout(() => startCallListeningRef.current(), 200);
+          }
+          return;
+        }
+
+        setCallLiveText(text);
+        // Send the transcribed text to Bob
+        sendCallMessageRef.current(text.trim());
+      } catch (e) {
+        console.error("[Bob Call] Transcribe fetch error:", e);
+        setCallLiveText("");
+        if (callActiveRef.current) {
+          setTimeout(() => startCallListeningRef.current(), 1000);
         }
       }
-      const liveText = finalTranscript + interim;
-      console.log("[Bob Call] Speech:", liveText.slice(0, 60));
-      setCallLiveText(liveText);
+    };
 
-      // Drive mic level visualizer from speech activity
-      setMicLevel(0.6 + Math.random() * 0.4);
-      if (micLevelDecayRef.current) clearTimeout(micLevelDecayRef.current);
-      micLevelDecayRef.current = setTimeout(() => setMicLevel(0), 300);
+    // Record in 500ms chunks for data availability
+    recorder.start(500);
 
-      // Reset silence timer — send after 1.5s of silence
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      if (hasSpoken) {
+    // Use silence detection via analyser to know when to stop recording
+    const checkSilence = () => {
+      if (!callActiveRef.current || !analyserRef.current || recorder.state !== "recording") return;
+      const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
+
+      if (avg > 0.02) {
+        // Sound detected — reset silence timer
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      } else if (!silenceTimerRef.current && hasSpeech) {
+        // Silence after speech — stop recording after 1.5s
         silenceTimerRef.current = setTimeout(() => {
           silenceTimerRef.current = null;
-          if (!callActiveRef.current) return;
-          const textToSend = finalTranscript.trim();
-          if (textToSend) {
-            try { recognition.stop(); } catch (e) { /* ignore */ }
-            callRecRef.current = null;
-            setCallLiveText("");
-            console.log("[Bob Call] Sending after silence:", textToSend.slice(0, 60));
-            sendCallMessageRef.current(textToSend);
+          if (recorder.state === "recording") {
+            console.log("[Bob Call] Silence detected, stopping recording");
+            recorder.stop();
           }
         }, 1500);
       }
-    };
 
-    recognition.onend = () => {
-      if (handledEnd) return;
-      handledEnd = true;
-      const lived = Date.now() - startTime;
-      console.log("[Bob Call] Recognition ended after", lived, "ms, callActive:", callActiveRef.current, "silenceTimer:", !!silenceTimerRef.current);
-      if (callActiveRef.current && !silenceTimerRef.current) {
-        callRecRef.current = null;
-        // Back off more aggressively if recognition died immediately
-        const delay = lived < 500 ? 2000 : 200;
-        setTimeout(() => {
-          if (callActiveRef.current && !silenceTimerRef.current) {
-            startCallListeningRef.current();
-          }
-        }, delay);
+      if (recorder.state === "recording") {
+        setTimeout(checkSilence, 100);
       }
     };
 
-    recognition.onerror = (e) => {
-      console.warn("[Bob Call] Recognition error:", e.error);
-      // For "aborted" and "no-speech", let onend handle the restart
-      if (e.error === "aborted" || e.error === "no-speech") return;
-      // For other errors, handle here and prevent onend from also restarting
-      handledEnd = true;
-      console.error("[Bob Call] Recognition error:", e.error);
-      if (callActiveRef.current) {
-        callRecRef.current = null;
-        setTimeout(() => {
-          if (callActiveRef.current && !silenceTimerRef.current) {
-            startCallListeningRef.current();
-          }
-        }, 2000);
-      }
-    };
+    // Start silence detection after a brief delay
+    setTimeout(checkSilence, 300);
 
-    try {
-      recognition.start();
-      console.log("[Bob Call] Recognition started");
-    } catch (e) {
-      console.error("[Bob Call] Recognition start error:", e);
-      if (callActiveRef.current) {
-        setTimeout(() => {
-          if (callActiveRef.current) startCallListeningRef.current();
-        }, 2000);
+    // Safety: max recording length of 30s
+    setTimeout(() => {
+      if (recorder.state === "recording") {
+        console.log("[Bob Call] Max recording time reached");
+        recorder.stop();
       }
-    }
+    }, 30000);
   }, []);
 
   // Keep ref in sync
@@ -666,15 +716,14 @@ export default function BobPage({ currentUser, hsToken }) {
 
   // ─── Start call ───────────────────────────────────────────────────────
   const startCall = useCallback(async () => {
-    // Request mic permission explicitly, then release it before SpeechRecognition starts.
-    // This ensures the browser has granted mic access so SpeechRecognition doesn't silently fail.
+    // Get mic stream — keep it open for the entire call
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop()); // Release immediately
-      console.log("[Bob Call] Mic permission granted");
+      micStreamRef.current = stream;
+      console.log("[Bob Call] Mic stream acquired");
     } catch (e) {
       console.error("[Bob Call] Mic permission denied:", e);
-      return; // Can't start call without mic
+      return;
     }
 
     callActiveRef.current = true;
@@ -691,15 +740,19 @@ export default function BobPage({ currentUser, hsToken }) {
       setCallSeconds(s => s + 1);
     }, 1000);
 
-    // Start listening first, then mic monitor (so SpeechRecognition grabs mic first)
-    startCallListening();
-    setTimeout(() => startMicMonitor(), 300);
+    // Start mic level monitor, then start listening
+    startMicMonitor();
+    setTimeout(() => startCallListening(), 300);
   }, [messages, startCallListening, startMicMonitor]);
 
   // ─── End call ─────────────────────────────────────────────────────────
   const endCall = useCallback(() => {
     callActiveRef.current = false;
 
+    if (recorderRef.current && recorderRef.current.state === "recording") {
+      try { recorderRef.current.stop(); } catch (e) { /* ignore */ }
+    }
+    recorderRef.current = null;
     if (callRecRef.current) {
       try { callRecRef.current.abort(); } catch (e) { /* ignore */ }
       callRecRef.current = null;
@@ -1186,7 +1239,7 @@ export default function BobPage({ currentUser, hsToken }) {
           </div>
 
           {/* Call button */}
-          {(window.SpeechRecognition || window.webkitSpeechRecognition) && (
+          {typeof MediaRecorder !== "undefined" && (
             <button
               onClick={startCall}
               title="Start voice call with Bob"
