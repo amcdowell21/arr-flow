@@ -101,7 +101,7 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
   const micLevelPollRef = useRef(null);
   const [micLevel, setMicLevel] = useState(0);
 
-  // ─── Drag state ─────────────────────────────────────────────────────────
+  // ─── Drag state (bubble) ────────────────────────────────────────────────
   const [pos, setPos] = useState({ x: 24, y: null }); // y=null means bottom-anchored
   const [bottomOffset, setBottomOffset] = useState(24);
   const dragRef = useRef(null);
@@ -109,8 +109,13 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
   const dragStart = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
   const hasMoved = useRef(false);
 
+  // ─── Drag state (chat modal) ──────────────────────────────────────────
+  const [chatPos, setChatPos] = useState(null); // null = auto-position, otherwise {x,y}
+  const chatDragging = useRef(false);
+  const chatDragStart = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+
   const onPointerDown = useCallback((e) => {
-    if (chatOpen) return; // don't drag when chat is open
+    if (chatOpen) return;
     isDragging.current = true;
     hasMoved.current = false;
     const rect = dragRef.current.getBoundingClientRect();
@@ -118,18 +123,39 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
     e.preventDefault();
   }, [chatOpen]);
 
+  const onChatPointerDown = useCallback((e) => {
+    // Only drag from the header area
+    chatDragging.current = true;
+    const modal = e.currentTarget.closest("[data-bob-chat]");
+    if (!modal) return;
+    const rect = modal.getBoundingClientRect();
+    chatDragStart.current = { x: e.clientX, y: e.clientY, startX: rect.left, startY: rect.top };
+    e.preventDefault();
+  }, []);
+
   useEffect(() => {
     const onMove = (e) => {
-      if (!isDragging.current) return;
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true;
-      const newX = dragStart.current.startX + dx;
-      const newY = dragStart.current.startY + dy;
-      setPos({ x: Math.max(0, Math.min(newX, window.innerWidth - 56)), y: Math.max(0, Math.min(newY, window.innerHeight - 56)) });
-      setBottomOffset(null);
+      if (isDragging.current) {
+        const dx = e.clientX - dragStart.current.x;
+        const dy = e.clientY - dragStart.current.y;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved.current = true;
+        const newX = dragStart.current.startX + dx;
+        const newY = dragStart.current.startY + dy;
+        setPos({ x: Math.max(0, Math.min(newX, window.innerWidth - 56)), y: Math.max(0, Math.min(newY, window.innerHeight - 56)) });
+        setBottomOffset(null);
+      }
+      if (chatDragging.current) {
+        const dx = e.clientX - chatDragStart.current.x;
+        const dy = e.clientY - chatDragStart.current.y;
+        const newX = chatDragStart.current.startX + dx;
+        const newY = chatDragStart.current.startY + dy;
+        setChatPos({
+          x: Math.max(0, Math.min(newX, window.innerWidth - 200)),
+          y: Math.max(0, Math.min(newY, window.innerHeight - 200)),
+        });
+      }
     };
-    const onUp = () => { isDragging.current = false; };
+    const onUp = () => { isDragging.current = false; chatDragging.current = false; };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
@@ -370,8 +396,8 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
     setExpanded(e => !e);
   };
 
-  const openChat = () => { setChatOpen(true); setExpanded(false); };
-  const closeChat = () => { setChatOpen(false); };
+  const openChat = () => { setChatOpen(true); setExpanded(false); setChatPos(null); };
+  const closeChat = () => { setChatOpen(false); setChatPos(null); };
   const handleStartCall = () => { setExpanded(false); startCall(); };
 
   // ─── Compute bubble position ────────────────────────────────────────
@@ -490,28 +516,29 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
         />
       )}
 
-      {/* Chat modal */}
+      {/* Chat modal — no backdrop, draggable */}
       {chatOpen && (
-        <>
-          <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 10000 }}
-            onClick={closeChat}
-          />
-          <div style={{
+          <div data-bob-chat style={{
             position: "fixed", zIndex: 10001,
-            bottom: 80, left: pos.x < window.innerWidth / 2 ? pos.x : "auto",
-            right: pos.x >= window.innerWidth / 2 ? (window.innerWidth - pos.x - 48) : "auto",
+            ...(chatPos
+              ? { left: chatPos.x, top: chatPos.y }
+              : { bottom: 80, left: pos.x < window.innerWidth / 2 ? pos.x : "auto",
+                  right: pos.x >= window.innerWidth / 2 ? (window.innerWidth - pos.x - 48) : "auto" }
+            ),
             width: 400, maxWidth: "calc(100vw - 32px)", height: 520, maxHeight: "calc(100vh - 120px)",
             background: "#0f172a", border: "1px solid #334155", borderRadius: 16,
             display: "flex", flexDirection: "column", overflow: "hidden",
             boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
-            animation: "fadeUp 0.2s ease",
+            animation: chatPos ? "none" : "fadeUp 0.2s ease",
           }}>
-            {/* Header */}
-            <div style={{
-              padding: "14px 16px", borderBottom: "1px solid #334155",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
+            {/* Header — drag handle */}
+            <div
+              onPointerDown={onChatPointerDown}
+              style={{
+                padding: "14px 16px", borderBottom: "1px solid #334155",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                cursor: "grab", userSelect: "none", touchAction: "none",
+              }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{
                   width: 28, height: 28, borderRadius: "50%",
@@ -638,7 +665,6 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
               </button>
             </div>
           </div>
-        </>
       )}
 
       <style>{`
