@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { db } from "./firebase";
-import { collection, query, where, orderBy, onSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 
 // ─── Lightweight markdown renderer ──────────────────────────────────────────
 function renderMarkdown(text) {
@@ -220,11 +220,12 @@ export default function BobPage({ currentUser, hsToken }) {
     if (!currentUser) return;
     const q = query(
       collection(db, "bobConversations"),
-      where("userId", "==", currentUser.uid),
-      orderBy("updatedAt", "desc")
+      where("userId", "==", currentUser.uid)
     );
     const unsub = onSnapshot(q, snap => {
-      setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      convs.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+      setConversations(convs);
     });
     return unsub;
   }, [currentUser]);

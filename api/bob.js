@@ -519,6 +519,8 @@ export default async function handler(req, res) {
     content: m.content,
   }));
 
+  let finalTextContent = "";
+
   try {
     // Agentic loop — Claude may call tools multiple times
     let maxLoops = 10;
@@ -638,6 +640,7 @@ export default async function handler(req, res) {
       }
 
       // Final text response — done
+      finalTextContent = textContent;
       break;
     }
 
@@ -646,7 +649,7 @@ export default async function handler(req, res) {
       const db = getDb();
       const convData = {
         userId,
-        messages: req.body.messages.concat([{ role: "assistant", content: textContent || "", timestamp: Date.now() }]),
+        messages: req.body.messages.concat([{ role: "assistant", content: finalTextContent || "", timestamp: Date.now() }]),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
@@ -660,7 +663,8 @@ export default async function handler(req, res) {
         send("conversation", { id: newDoc.id, title: convData.title });
       }
     } catch (e) {
-      // Non-fatal: conversation save failure shouldn't break the chat
+      console.error("Conversation save error:", e.message);
+      send("save_error", { message: e.message });
     }
 
     send("done", {});
