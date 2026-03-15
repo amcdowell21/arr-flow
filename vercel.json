@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/eleven-webhook/:path*",
+      "destination": "/api/eleven-webhook"
+    }
+  ]
+}
