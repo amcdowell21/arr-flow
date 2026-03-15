@@ -570,6 +570,7 @@ export default function BobPage({ currentUser, hsToken }) {
 
     let finalTranscript = "";
     let hasSpoken = false;
+    const startTime = Date.now();
 
     setCallPhase("listening");
     setCallLiveText("");
@@ -615,15 +616,18 @@ export default function BobPage({ currentUser, hsToken }) {
     };
 
     recognition.onend = () => {
-      console.log("[Bob Call] Recognition ended, callActive:", callActiveRef.current, "silenceTimer:", !!silenceTimerRef.current);
+      const lived = Date.now() - startTime;
+      console.log("[Bob Call] Recognition ended after", lived, "ms, callActive:", callActiveRef.current, "silenceTimer:", !!silenceTimerRef.current);
       // If call is still active and silence timer hasn't fired, do a clean restart
       if (callActiveRef.current && !silenceTimerRef.current) {
         callRecRef.current = null;
+        // Back off if recognition died immediately (< 500ms) to avoid tight loop
+        const delay = lived < 500 ? 1000 : 150;
         setTimeout(() => {
           if (callActiveRef.current && !silenceTimerRef.current) {
             startCallListeningRef.current();
           }
-        }, 150);
+        }, delay);
       }
     };
 
@@ -668,7 +672,18 @@ export default function BobPage({ currentUser, hsToken }) {
   useEffect(() => { startCallListeningRef.current = startCallListening; }, [startCallListening]);
 
   // ─── Start call ───────────────────────────────────────────────────────
-  const startCall = useCallback(() => {
+  const startCall = useCallback(async () => {
+    // Request mic permission explicitly, then release it before SpeechRecognition starts.
+    // This ensures the browser has granted mic access so SpeechRecognition doesn't silently fail.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop()); // Release immediately
+      console.log("[Bob Call] Mic permission granted");
+    } catch (e) {
+      console.error("[Bob Call] Mic permission denied:", e);
+      return; // Can't start call without mic
+    }
+
     callActiveRef.current = true;
     callMessagesRef.current = [...messages];
     callTranscriptRef.current = messages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp || Date.now() }));
