@@ -408,6 +408,82 @@ export default function BobPage({ currentUser, hsToken }) {
 
       const conversation = await Conversation.startSession({
         signedUrl,
+        clientTools: {
+          // These tools let the agent query real platform data from Firestore
+          list_deals: async () => {
+            console.log("[Bob Call] Tool: list_deals");
+            try {
+              const snap = await getDocs(collection(db, "pipelineDeals"));
+              const deals = snap.docs.map(d => {
+                const data = d.data();
+                return { name: data.name, value: data.value, bucket: data.bucket, expectedCloseMonth: data.expectedCloseMonth, confidence: data.manualConfidence ?? data.confidence, closedWon: data.closedWon || false, notes: data.notes };
+              });
+              const active = deals.filter(d => d.bucket === "active" && !d.closedWon);
+              const totalValue = active.reduce((s, d) => s + (d.value || 0), 0);
+              return `${deals.length} total deals. ${active.length} active deals worth $${totalValue.toLocaleString()}. Deals: ${active.map(d => `${d.name} ($${(d.value || 0).toLocaleString()}, close ${d.expectedCloseMonth || "TBD"}, ${d.confidence || 0}% confidence)`).join("; ")}`;
+            } catch (e) { return "Error loading deals: " + e.message; }
+          },
+          list_events: async () => {
+            console.log("[Bob Call] Tool: list_events");
+            try {
+              const snap = await getDocs(collection(db, "pipelineEvents"));
+              const events = snap.docs.map(d => d.data());
+              return events.length > 0
+                ? `${events.length} events: ${events.map(e => `${e.name} (${e.date}, ${e.peopleMet || 0} people met, ${e.convertedToMeeting || 0} meetings)`).join("; ")}`
+                : "No events tracked yet.";
+            } catch (e) { return "Error loading events: " + e.message; }
+          },
+          list_outbound: async () => {
+            console.log("[Bob Call] Tool: list_outbound");
+            try {
+              const snap = await getDocs(collection(db, "outboundActuals"));
+              const entries = snap.docs.map(d => d.data()).sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""));
+              const recent = entries.slice(0, 4);
+              return recent.length > 0
+                ? `Recent outbound (last ${recent.length} weeks): ${recent.map(e => `Week of ${e.weekOf}: ${e.touches || 0} touches, ${e.bookings || 0} bookings, ${e.held || 0} held, ${e.deals || 0} deals`).join("; ")}`
+                : "No outbound activity logged yet.";
+            } catch (e) { return "Error loading outbound: " + e.message; }
+          },
+          read_notes: async () => {
+            console.log("[Bob Call] Tool: read_notes");
+            try {
+              if (!currentUser) return "No user logged in.";
+              const snap = await getDocs(query(collection(db, "userNotes"), where("__name__", "==", currentUser.uid)));
+              if (snap.empty) return "No notes yet.";
+              const data = snap.docs[0].data();
+              const blocks = data.blocks || [];
+              const textBlocks = blocks.filter(b => b.content).map(b => {
+                const prefix = b.type === "todo" ? (b.checked ? "[x] " : "[ ] ") : "";
+                return prefix + b.content;
+              });
+              return textBlocks.length > 0
+                ? `Notes (${data.title || "Untitled"}): ${textBlocks.slice(0, 15).join("; ")}`
+                : "Notes document exists but is empty.";
+            } catch (e) { return "Error loading notes: " + e.message; }
+          },
+          get_pipeline_summary: async () => {
+            console.log("[Bob Call] Tool: get_pipeline_summary");
+            try {
+              const snap = await getDocs(collection(db, "pipelineDeals"));
+              const deals = snap.docs.map(d => d.data());
+              const buckets = {};
+              deals.forEach(d => {
+                if (d.closedWon) return;
+                const b = d.bucket || "untagged";
+                if (!buckets[b]) buckets[b] = { count: 0, value: 0 };
+                buckets[b].count++;
+                buckets[b].value += d.value || 0;
+              });
+              const won = deals.filter(d => d.closedWon);
+              const wonValue = won.reduce((s, d) => s + (d.value || 0), 0);
+              let summary = `Pipeline summary: ${won.length} closed won ($${wonValue.toLocaleString()}).`;
+              for (const [bucket, data] of Object.entries(buckets)) {
+                summary += ` ${bucket}: ${data.count} deals worth $${data.value.toLocaleString()}.`;
+              }
+              return summary;
+            } catch (e) { return "Error loading pipeline: " + e.message; }
+          },
+        },
         onConnect: () => {
           console.log("[Bob Call] ElevenLabs connected");
           setCallPhase("listening");
@@ -447,9 +523,6 @@ export default function BobPage({ currentUser, hsToken }) {
             setCallPhase("listening");
             setSpeaking(false);
           }
-        },
-        onDebug: (msg) => {
-          console.log("[Bob Call] Debug:", JSON.stringify(msg));
         },
       });
 
