@@ -409,7 +409,7 @@ export default function BobPage({ currentUser, hsToken }) {
 
       const conversation = await Conversation.startSession({
         signedUrl,
-        overrides: voiceId ? { tts: { voiceId, modelId: "eleven_multilingual_v2", stability: 0.5, similarityBoost: 0.85 } } : undefined,
+        // Voice is configured in the ElevenLabs agent dashboard
         clientTools: {
           // These tools let the agent query real platform data from Firestore
           list_deals: async () => {
