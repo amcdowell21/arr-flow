@@ -1,0 +1,629 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B43DC5842F68101A00DFE91B /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B43DC5832F68101A00DFE91B /* FirebaseAuth */; };
+		B43DC5862F68101A00DFE91B /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B43DC5852F68101A00DFE91B /* FirebaseFirestore */; };
+		B43DC5892F68137100DFE91B /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = B43DC5882F68137100DFE91B /* FirebaseAnalytics */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B43DC4D62F680A8800DFE91B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B43DC4C02F680A8600DFE91B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B43DC4C72F680A8600DFE91B;
+			remoteInfo = "ARR Flow";
+		};
+		B43DC4E02F680A8800DFE91B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B43DC4C02F680A8600DFE91B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B43DC4C72F680A8600DFE91B;
+			remoteInfo = "ARR Flow";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B43DC4C82F680A8600DFE91B /* ARR Flow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ARR Flow.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B43DC4D52F680A8800DFE91B /* ARR FlowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ARR FlowTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B43DC4DF2F680A8800DFE91B /* ARR FlowUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ARR FlowUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B43DC5872F6812F300DFE91B /* Exceptions for "ARRFlow" folder in "ARR Flow" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B43DC4C72F680A8600DFE91B /* ARR Flow */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		B43DC4CA2F680A8600DFE91B /* ARR Flow */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "ARR Flow";
+			sourceTree = "<group>";
+		};
+		B43DC4D82F680A8800DFE91B /* ARR FlowTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "ARR FlowTests";
+			sourceTree = "<group>";
+		};
+		B43DC4E22F680A8800DFE91B /* ARR FlowUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "ARR FlowUITests";
+			sourceTree = "<group>";
+		};
+		B43DC5632F680B1200DFE91B /* ARRFlow */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B43DC5872F6812F300DFE91B /* Exceptions for "ARRFlow" folder in "ARR Flow" target */,
+			);
+			path = ARRFlow;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B43DC4C52F680A8600DFE91B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B43DC5842F68101A00DFE91B /* FirebaseAuth in Frameworks */,
+				B43DC5862F68101A00DFE91B /* FirebaseFirestore in Frameworks */,
+				B43DC5892F68137100DFE91B /* FirebaseAnalytics in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B43DC4D22F680A8800DFE91B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B43DC4DC2F680A8800DFE91B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B43DC4BF2F680A8600DFE91B = {
+			isa = PBXGroup;
+			children = (
+				B43DC5632F680B1200DFE91B /* ARRFlow */,
+				B43DC4CA2F680A8600DFE91B /* ARR Flow */,
+				B43DC4D82F680A8800DFE91B /* ARR FlowTests */,
+				B43DC4E22F680A8800DFE91B /* ARR FlowUITests */,
+				B43DC4C92F680A8600DFE91B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B43DC4C92F680A8600DFE91B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B43DC4C82F680A8600DFE91B /* ARR Flow.app */,
+				B43DC4D52F680A8800DFE91B /* ARR FlowTests.xctest */,
+				B43DC4DF2F680A8800DFE91B /* ARR FlowUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B43DC4C72F680A8600DFE91B /* ARR Flow */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B43DC4E92F680A8800DFE91B /* Build configuration list for PBXNativeTarget "ARR Flow" */;
+			buildPhases = (
+				B43DC4C42F680A8600DFE91B /* Sources */,
+				B43DC4C52F680A8600DFE91B /* Frameworks */,
+				B43DC4C62F680A8600DFE91B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B43DC4CA2F680A8600DFE91B /* ARR Flow */,
+				B43DC5632F680B1200DFE91B /* ARRFlow */,
+			);
+			name = "ARR Flow";
+			packageProductDependencies = (
+				B43DC5832F68101A00DFE91B /* FirebaseAuth */,
+				B43DC5852F68101A00DFE91B /* FirebaseFirestore */,
+				B43DC5882F68137100DFE91B /* FirebaseAnalytics */,
+			);
+			productName = "ARR Flow";
+			productReference = B43DC4C82F680A8600DFE91B /* ARR Flow.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B43DC4D42F680A8800DFE91B /* ARR FlowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B43DC4EC2F680A8800DFE91B /* Build configuration list for PBXNativeTarget "ARR FlowTests" */;
+			buildPhases = (
+				B43DC4D12F680A8800DFE91B /* Sources */,
+				B43DC4D22F680A8800DFE91B /* Frameworks */,
+				B43DC4D32F680A8800DFE91B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B43DC4D72F680A8800DFE91B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B43DC4D82F680A8800DFE91B /* ARR FlowTests */,
+			);
+			name = "ARR FlowTests";
+			packageProductDependencies = (
+			);
+			productName = "ARR FlowTests";
+			productReference = B43DC4D52F680A8800DFE91B /* ARR FlowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		B43DC4DE2F680A8800DFE91B /* ARR FlowUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B43DC4EF2F680A8800DFE91B /* Build configuration list for PBXNativeTarget "ARR FlowUITests" */;
+			buildPhases = (
+				B43DC4DB2F680A8800DFE91B /* Sources */,
+				B43DC4DC2F680A8800DFE91B /* Frameworks */,
+				B43DC4DD2F680A8800DFE91B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B43DC4E12F680A8800DFE91B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B43DC4E22F680A8800DFE91B /* ARR FlowUITests */,
+			);
+			name = "ARR FlowUITests";
+			packageProductDependencies = (
+			);
+			productName = "ARR FlowUITests";
+			productReference = B43DC4DF2F680A8800DFE91B /* ARR FlowUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B43DC4C02F680A8600DFE91B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1630;
+				LastUpgradeCheck = 1630;
+				TargetAttributes = {
+					B43DC4C72F680A8600DFE91B = {
+						CreatedOnToolsVersion = 16.3;
+					};
+					B43DC4D42F680A8800DFE91B = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = B43DC4C72F680A8600DFE91B;
+					};
+					B43DC4DE2F680A8800DFE91B = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = B43DC4C72F680A8600DFE91B;
+					};
+				};
+			};
+			buildConfigurationList = B43DC4C32F680A8600DFE91B /* Build configuration list for PBXProject "ARR Flow" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B43DC4BF2F680A8600DFE91B;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B43DC5822F68101A00DFE91B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B43DC4C92F680A8600DFE91B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B43DC4C72F680A8600DFE91B /* ARR Flow */,
+				B43DC4D42F680A8800DFE91B /* ARR FlowTests */,
+				B43DC4DE2F680A8800DFE91B /* ARR FlowUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B43DC4C62F680A8600DFE91B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B43DC4D32F680A8800DFE91B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B43DC4DD2F680A8800DFE91B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B43DC4C42F680A8600DFE91B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B43DC4D12F680A8800DFE91B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B43DC4DB2F680A8800DFE91B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B43DC4D72F680A8800DFE91B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B43DC4C72F680A8600DFE91B /* ARR Flow */;
+			targetProxy = B43DC4D62F680A8800DFE91B /* PBXContainerItemProxy */;
+		};
+		B43DC4E12F680A8800DFE91B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B43DC4C72F680A8600DFE91B /* ARR Flow */;
+			targetProxy = B43DC4E02F680A8800DFE91B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B43DC4E72F680A8800DFE91B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B43DC4E82F680A8800DFE91B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B43DC4EA2F680A8800DFE91B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ARRFlow/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "UniqLearn.ARR-Flow";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B43DC4EB2F680A8800DFE91B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ARRFlow/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "UniqLearn.ARR-Flow";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B43DC4ED2F680A8800DFE91B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "UniqLearn.ARR-FlowTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ARR Flow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ARR Flow";
+			};
+			name = Debug;
+		};
+		B43DC4EE2F680A8800DFE91B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "UniqLearn.ARR-FlowTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ARR Flow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ARR Flow";
+			};
+			name = Release;
+		};
+		B43DC4F02F680A8800DFE91B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "UniqLearn.ARR-FlowUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "ARR Flow";
+			};
+			name = Debug;
+		};
+		B43DC4F12F680A8800DFE91B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TN65MAHG28;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "UniqLearn.ARR-FlowUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "ARR Flow";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B43DC4C32F680A8600DFE91B /* Build configuration list for PBXProject "ARR Flow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B43DC4E72F680A8800DFE91B /* Debug */,
+				B43DC4E82F680A8800DFE91B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B43DC4E92F680A8800DFE91B /* Build configuration list for PBXNativeTarget "ARR Flow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B43DC4EA2F680A8800DFE91B /* Debug */,
+				B43DC4EB2F680A8800DFE91B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B43DC4EC2F680A8800DFE91B /* Build configuration list for PBXNativeTarget "ARR FlowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B43DC4ED2F680A8800DFE91B /* Debug */,
+				B43DC4EE2F680A8800DFE91B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B43DC4EF2F680A8800DFE91B /* Build configuration list for PBXNativeTarget "ARR FlowUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B43DC4F02F680A8800DFE91B /* Debug */,
+				B43DC4F12F680A8800DFE91B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B43DC5822F68101A00DFE91B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B43DC5832F68101A00DFE91B /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B43DC5822F68101A00DFE91B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		B43DC5852F68101A00DFE91B /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B43DC5822F68101A00DFE91B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		B43DC5882F68137100DFE91B /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B43DC5822F68101A00DFE91B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = B43DC4C02F680A8600DFE91B /* Project object */;
+}
