@@ -305,6 +305,16 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
 
       const conversation = await Conversation.startSession({
         signedUrl,
+        overrides: {
+          agent: {
+            firstMessage: "Hey, how can I help you?",
+          },
+          turnDetection: {
+            silenceDurationMs: 300,
+            threshold: 0.1,
+            allowInterruptions: true,
+          },
+        },
         clientTools: {
           list_deals: async () => {
             try {
