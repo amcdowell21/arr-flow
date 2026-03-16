@@ -101,13 +101,31 @@ class FirestoreService {
             )
         } ?? []
 
-        let followUps = (d["followUps"] as? [[String: Any]])?.map { f in
-            FollowUp(
-                id: f["id"] as? String ?? UUID().uuidString,
-                task: f["task"] as? String ?? "",
+        // Web app stores followUps as a map { key: { date, todoText, dealName, dealId, completed } }
+        let followUps: [FollowUp]? = (d["followUps"] as? [String: Any])?.compactMap { (key, value) in
+            guard let f = value as? [String: Any] else { return nil }
+
+            // Parse date: web stores as string "YYYY-MM-DD", could also be a Timestamp
+            let dueDate: Date
+            if let ts = f["date"] as? Timestamp {
+                dueDate = ts.dateValue()
+            } else if let dateStr = f["date"] as? String {
+                let fmt = DateFormatter()
+                fmt.dateFormat = "yyyy-MM-dd"
+                fmt.timeZone = TimeZone.current
+                dueDate = fmt.date(from: dateStr) ?? Date()
+            } else if let ts = f["dueDate"] as? Timestamp {
+                dueDate = ts.dateValue()
+            } else {
+                dueDate = Date()
+            }
+
+            return FollowUp(
+                id: key,
+                task: f["todoText"] as? String ?? f["task"] as? String ?? "",
                 dealId: f["dealId"] as? String,
                 dealName: f["dealName"] as? String,
-                dueDate: (f["dueDate"] as? Timestamp)?.dateValue() ?? Date(),
+                dueDate: dueDate,
                 completed: f["completed"] as? Bool ?? false,
                 createdAt: (f["createdAt"] as? Timestamp)?.dateValue() ?? Date()
             )
@@ -132,25 +150,30 @@ class FirestoreService {
             return dict
         }
 
-        let followUpsData = notes.followUps?.map { f -> [String: Any] in
-            var dict: [String: Any] = [
-                "id": f.id,
-                "task": f.task,
-                "dueDate": Timestamp(date: f.dueDate),
-                "completed": f.completed,
-                "createdAt": Timestamp(date: f.createdAt)
-            ]
-            if let did = f.dealId { dict["dealId"] = did }
-            if let dn = f.dealName { dict["dealName"] = dn }
-            return dict
+        // Write followUps as a map keyed by id to match web app format
+        var followUpsMap: [String: Any] = [:]
+        if let fus = notes.followUps {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyy-MM-dd"
+            fmt.timeZone = TimeZone.current
+            for f in fus {
+                var dict: [String: Any] = [
+                    "date": fmt.string(from: f.dueDate),
+                    "todoText": f.task,
+                    "completed": f.completed
+                ]
+                if let did = f.dealId { dict["dealId"] = did }
+                if let dn = f.dealName { dict["dealName"] = dn }
+                followUpsMap[f.id] = dict
+            }
         }
 
         var data: [String: Any] = [
             "title": notes.title,
             "blocks": blocksData,
+            "followUps": followUpsMap,
             "updatedAt": FieldValue.serverTimestamp()
         ]
-        if let fu = followUpsData { data["followUps"] = fu }
 
         try await db.collection("userNotes").document(userId).setData(data, merge: true)
     }
