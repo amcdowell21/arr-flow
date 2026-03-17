@@ -468,7 +468,7 @@ export default async function handler(req, res) {
     }
 
     // Agentic loop — Claude may call tools
-    let maxLoops = 5; // Fewer loops for voice (latency matters)
+    let maxLoops = 3; // Fewer loops for voice (latency matters)
     while (maxLoops-- > 0) {
       const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -478,8 +478,8 @@ export default async function handler(req, res) {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1024, // Shorter for voice
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 512, // Shorter for voice
           system: getSystemPrompt(timezone),
           tools: TOOLS,
           messages: claudeMessages,
@@ -488,6 +488,9 @@ export default async function handler(req, res) {
       });
 
       if (!claudeRes.ok) {
+        const errBody = await claudeRes.text();
+        console.error("Claude API error:", claudeRes.status, errBody);
+        console.error("Messages sent:", JSON.stringify(claudeMessages));
         sendChunk("Sorry, I'm having trouble connecting right now.");
         break;
       }
@@ -582,7 +585,7 @@ export default async function handler(req, res) {
       break;
     }
   } catch (e) {
-    console.error("Webhook error:", e);
+    console.error("Webhook error:", e?.message, e?.stack);
     sendChunk("Sorry, something went wrong.");
   }
 
