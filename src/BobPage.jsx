@@ -409,7 +409,11 @@ export default function BobPage({ currentUser, hsToken }) {
 
       const conversation = await Conversation.startSession({
         signedUrl,
-        // Voice is configured in the ElevenLabs agent dashboard
+        overrides: {
+          agent: {
+            prompt: { prompt: `[USER_ID:${currentUser?.uid || ""}] [HS_TOKEN:${hsToken || ""}]` },
+          },
+        },
         clientTools: {
           // These tools let the agent query real platform data from Firestore
           list_deals: async () => {

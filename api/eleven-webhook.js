@@ -458,7 +458,19 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  const userId = req.headers["x-user-id"] || "";
+  // Extract userId and hsToken from system message (passed via ElevenLabs agent prompt override)
+  // Format: [USER_ID:xxx] [HS_TOKEN:xxx]
+  let userId = req.headers["x-user-id"] || "";
+  let hsToken = req.headers["x-hs-token"] || process.env.HUBSPOT_TOKEN || "";
+  const systemMsg = messages.find(m => m.role === "system");
+  if (systemMsg && systemMsg.content) {
+    const uidMatch = systemMsg.content.match(/\[USER_ID:([^\]]*)\]/);
+    const hsMatch = systemMsg.content.match(/\[HS_TOKEN:([^\]]*)\]/);
+    if (uidMatch && uidMatch[1]) userId = uidMatch[1];
+    if (hsMatch && hsMatch[1]) hsToken = hsMatch[1];
+  }
+  console.log("[eleven-webhook] Resolved userId:", userId ? userId.slice(0, 8) + "..." : "(empty)");
+
   const timezone = req.headers["x-timezone"] || "America/Chicago";
   const tz = timezone || "America/Chicago";
 
@@ -474,7 +486,6 @@ export default async function handler(req, res) {
     res.write(`data: ${JSON.stringify(chunk)}\n\n`);
   };
 
-  const hsToken = req.headers["x-hs-token"] || process.env.HUBSPOT_TOKEN || "";
   const ctx = { userId, hsToken, tz };
 
   try {
