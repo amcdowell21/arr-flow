@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { db } from "./firebase";
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, updateDoc, setDoc, getDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 
 // ─── Lightweight markdown (minimal for float chat) ──────────────────────────
 function renderMarkdown(text) {
@@ -358,6 +358,86 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
               const active = deals.filter(d => !d.closedWon && d.bucket === "active");
               const won = deals.filter(d => d.closedWon);
               return `${active.length} active deals ($${active.reduce((s, d) => s + (d.value || 0), 0).toLocaleString()}), ${won.length} closed won ($${won.reduce((s, d) => s + (d.value || 0), 0).toLocaleString()}).`;
+            } catch (e) { return "Error: " + e.message; }
+          },
+          update_notes: async ({ title, blocks }) => {
+            try {
+              if (!currentUser) return "No user.";
+              const updates = { updatedAt: Date.now() };
+              if (title !== undefined) updates.title = title;
+              if (blocks !== undefined) updates.blocks = blocks;
+              await setDoc(doc(db, "userNotes", currentUser.uid), updates, { merge: true });
+              return "Notes updated successfully.";
+            } catch (e) { return "Error: " + e.message; }
+          },
+          add_follow_up: async ({ dealId, dealName, date, todoText }) => {
+            try {
+              if (!currentUser) return "No user.";
+              const ref = doc(db, "userNotes", currentUser.uid);
+              const snap = await getDoc(ref);
+              const followUps = snap.exists() ? (snap.data().followUps || {}) : {};
+              const key = `${dealName.replace(/\s+/g, "_")}_${Date.now()}`;
+              followUps[key] = { dealId: dealId || null, dealName, date, todoText, completed: false };
+              await setDoc(ref, { followUps }, { merge: true });
+              return `Follow-up scheduled for ${dealName} on ${date}.`;
+            } catch (e) { return "Error: " + e.message; }
+          },
+          complete_follow_up: async ({ followUpKey }) => {
+            try {
+              if (!currentUser) return "No user.";
+              const ref = doc(db, "userNotes", currentUser.uid);
+              const snap = await getDoc(ref);
+              if (!snap.exists()) return "No notes found.";
+              const followUps = snap.data().followUps || {};
+              if (!followUps[followUpKey]) return "Follow-up not found.";
+              followUps[followUpKey].completed = true;
+              await setDoc(ref, { followUps }, { merge: true });
+              return "Follow-up completed.";
+            } catch (e) { return "Error: " + e.message; }
+          },
+          update_deal: async ({ dealId, updates }) => {
+            try {
+              await updateDoc(doc(db, "pipelineDeals", dealId), { ...updates, updatedAt: serverTimestamp() });
+              return "Deal updated.";
+            } catch (e) { return "Error: " + e.message; }
+          },
+          create_deal: async ({ name, value, bucket, expectedCloseMonth, notes, funnelType }) => {
+            try {
+              await addDoc(collection(db, "pipelineDeals"), {
+                source: "bob", hubspotId: null, name, value: value || 0,
+                bucket: bucket || "untagged", expectedCloseMonth: expectedCloseMonth || "",
+                manualConfidence: 30, useAlgoConfidence: false, closedWon: false,
+                funnelType: funnelType || "outbound", funnelEventId: null,
+                meetingBooked: false, lastActivityDate: null, touchCount: 0,
+                notes: notes || "", hubspotStage: null, hubspotPipeline: null,
+                hubspotStageProbability: null,
+                createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+              });
+              return `Deal "${name}" created.`;
+            } catch (e) { return "Error: " + e.message; }
+          },
+          delete_deal: async ({ dealId }) => {
+            try {
+              await deleteDoc(doc(db, "pipelineDeals", dealId));
+              return "Deal deleted.";
+            } catch (e) { return "Error: " + e.message; }
+          },
+          create_event: async ({ name, date, peopleMet, convertedToMeeting }) => {
+            try {
+              await addDoc(collection(db, "pipelineEvents"), {
+                name, date, peopleMet: peopleMet || 0, convertedToMeeting: convertedToMeeting || 0,
+                dealsWon: 0, dealValue: 0, createdAt: serverTimestamp(),
+              });
+              return `Event "${name}" created.`;
+            } catch (e) { return "Error: " + e.message; }
+          },
+          create_outbound: async ({ weekOf, touches, bookings, held, deals }) => {
+            try {
+              await addDoc(collection(db, "outboundActuals"), {
+                weekOf, touches: touches || 0, bookings: bookings || 0,
+                held: held || 0, deals: deals || 0, createdAt: serverTimestamp(),
+              });
+              return `Outbound logged for week of ${weekOf}.`;
             } catch (e) { return "Error: " + e.message; }
           },
         },
