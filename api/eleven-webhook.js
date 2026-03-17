@@ -395,7 +395,6 @@ function annotateDates(obj, tz) {
 
 function getDateContext(tz = "America/Chicago") {
   const now = new Date();
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const wd = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(now);
   const p = {};
@@ -405,87 +404,30 @@ function getDateContext(tz = "America/Chicago") {
   return `Today is ${wd}, ${months[parseInt(p.month) - 1]} ${parseInt(p.day)}, ${p.year}.`;
 }
 
-// Pre-fetch all platform data and build a context string for the system prompt.
-// This eliminates tool calls entirely, making voice responses fast (~2s).
-async function fetchPlatformContext(userId, tz) {
-  const db = getDb();
-  const sections = [];
 
-  try {
-    // Deals
-    const dealsSnap = await db.collection("pipelineDeals").get();
-    const deals = dealsSnap.docs.map(d => {
-      const data = d.data();
-      return { name: data.name, value: data.value, bucket: data.bucket, expectedCloseMonth: data.expectedCloseMonth, confidence: data.manualConfidence ?? data.confidence, closedWon: data.closedWon || false, lastActivityDate: data.lastActivityDate };
-    });
-    const active = deals.filter(d => !d.closedWon && d.bucket === "active");
-    const won = deals.filter(d => d.closedWon);
-    const activeValue = active.reduce((s, d) => s + (d.value || 0), 0);
-    const wonValue = won.reduce((s, d) => s + (d.value || 0), 0);
-    let dealSummary = `PIPELINE: ${deals.length} total deals. ${active.length} active ($${activeValue.toLocaleString()}), ${won.length} closed won ($${wonValue.toLocaleString()}).`;
-    dealSummary += "\nActive deals: " + active.map(d => `${d.name} ($${(d.value||0).toLocaleString()}, ${d.confidence||0}% conf, close ${d.expectedCloseMonth||"TBD"})`).join("; ");
-    sections.push(dealSummary);
-  } catch (e) {
-    sections.push("PIPELINE: Could not load deals.");
-  }
-
-  try {
-    // Follow-ups
-    if (userId) {
-      const notesSnap = await db.collection("userNotes").doc(userId).get();
-      if (notesSnap.exists) {
-        const data = notesSnap.data();
-        const followUps = data.followUps || {};
-        const pending = Object.entries(followUps).filter(([, v]) => !v.completed);
-        if (pending.length > 0) {
-          const fuList = pending.map(([key, v]) => {
-            const day = v.date ? dayOfWeekForISO(v.date, tz) : "";
-            return `${v.dealName}: ${v.todoText} (${day} ${v.date || "no date"}) [key=${key}]`;
-          }).join("; ");
-          sections.push(`FOLLOW-UPS (${pending.length} pending): ${fuList}`);
-        } else {
-          sections.push("FOLLOW-UPS: None pending.");
-        }
-      }
-    }
-  } catch (e) {
-    sections.push("FOLLOW-UPS: Could not load.");
-  }
-
-  try {
-    // Events
-    const evSnap = await db.collection("pipelineEvents").get();
-    if (!evSnap.empty) {
-      const events = evSnap.docs.map(d => d.data());
-      sections.push("EVENTS: " + events.map(e => `${e.name} (${e.date}, ${e.peopleMet||0} met, ${e.convertedToMeeting||0} meetings)`).join("; "));
-    }
-  } catch (e) { /* skip */ }
-
-  try {
-    // Recent outbound
-    const obSnap = await db.collection("outboundActuals").get();
-    if (!obSnap.empty) {
-      const entries = obSnap.docs.map(d => d.data()).sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""));
-      const recent = entries.slice(0, 3);
-      sections.push("RECENT OUTBOUND: " + recent.map(e => `Wk ${e.weekOf}: ${e.touches||0} touches, ${e.bookings||0} bookings, ${e.held||0} held`).join("; "));
-    }
-  } catch (e) { /* skip */ }
-
-  return sections.join("\n\n");
-}
-
-function getSystemPrompt(tz, platformData) {
+function getSystemPrompt(tz) {
   return `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform.
 
 ${getDateContext(tz)}
 
 You are in a LIVE VOICE CALL. Keep responses SHORT and conversational — 1-3 sentences max. No markdown, no lists, no tables. Summarize data verbally. Be warm and natural.
 
-Here is the user's current platform data (pre-loaded, do NOT say you need to "check" or "look up" anything — you already have it):
+You have access to the platform's full data layer through tools. Use them proactively — if a user asks about their deals, call list_deals first. If they want to schedule a follow-up, use add_follow_up. If they want to change something, use the appropriate update tool.
 
-${platformData}
+Data model context:
+- Pipeline deals have buckets: active, future_q1q2, future_q3q4, renewal, untagged
+- Confidence is 0-100 (manual override or algorithmic)
+- expectedCloseMonth is YYYY-MM format
+- Deals can be linked to HubSpot (hubspotId field) — changes to closedWon and value auto-sync
+- Follow-ups are date-based reminders linked to deals
+- Notes use a block editor with types: text, h1, h2, h3, bullet, numbered, todo, quote, code, divider
 
-When mentioning dates, use the day-of-week exactly as shown in the data above. Never compute or guess day names yourself.`;
+CRITICAL DATE RULES — violating these is unacceptable:
+1. Dates in tool results are pre-annotated with their correct day-of-week (e.g. "Thursday 2026-03-19"). ALWAYS use the day-of-week exactly as it appears in the data. NEVER recompute or guess the day.
+2. For any other date, look it up in the calendar above. Do NOT compute days of the week yourself — you WILL get it wrong.
+3. If a date is not in the calendar and not in tool results, say just the date without a day name.
+
+Be concise and action-oriented. When you make changes, confirm what you did briefly.`;
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────────
@@ -532,10 +474,10 @@ export default async function handler(req, res) {
     res.write(`data: ${JSON.stringify(chunk)}\n\n`);
   };
 
-  try {
-    // Pre-fetch all data so Claude doesn't need tools (fast single call)
-    const platformData = await fetchPlatformContext(userId, tz);
+  const hsToken = req.headers["x-hs-token"] || process.env.HUBSPOT_TOKEN || "";
+  const ctx = { userId, hsToken, tz };
 
+  try {
     // Convert OpenAI messages to Claude format
     let claudeMessages = [];
     for (const msg of messages) {
@@ -548,31 +490,42 @@ export default async function handler(req, res) {
 
     console.log("[eleven-webhook] Calling Claude with", claudeMessages.length, "messages");
 
-    // Single Claude call — no tools, no loops
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 300,
-        system: getSystemPrompt(tz, platformData),
-        messages: claudeMessages,
-        stream: true,
-      }),
-    });
+    // Agentic loop — Claude may call tools multiple times
+    let maxLoops = 10;
+    while (maxLoops-- > 0) {
+      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2048,
+          system: getSystemPrompt(tz),
+          tools: TOOLS,
+          messages: claudeMessages,
+          stream: true,
+        }),
+      });
 
-    if (!claudeRes.ok) {
-      const errBody = await claudeRes.text();
-      console.error("[eleven-webhook] Claude API error:", claudeRes.status, errBody);
-      sendChunk("Sorry, I'm having trouble right now.");
-    } else {
+      if (!claudeRes.ok) {
+        const errBody = await claudeRes.text();
+        console.error("[eleven-webhook] Claude API error:", claudeRes.status, errBody);
+        sendChunk("Sorry, I'm having trouble right now.");
+        break;
+      }
+
+      // Parse Claude's SSE stream
       const reader = claudeRes.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentToolUse = null;
+      let toolUseBlocks = [];
+      let textContent = "";
+      let stopReason = null;
+      let inputJsonBuf = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -586,14 +539,72 @@ export default async function handler(req, res) {
           if (!line.startsWith("data: ")) continue;
           const data = line.slice(6).trim();
           if (data === "[DONE]") continue;
-          try {
-            const event = JSON.parse(data);
-            if (event.delta?.type === "text_delta") {
-              sendChunk(event.delta.text);
-            }
-          } catch { continue; }
+
+          let event;
+          try { event = JSON.parse(data); } catch { continue; }
+
+          switch (event.type) {
+            case "content_block_start":
+              if (event.content_block?.type === "tool_use") {
+                currentToolUse = { id: event.content_block.id, name: event.content_block.name, input: "" };
+                inputJsonBuf = "";
+              }
+              break;
+
+            case "content_block_delta":
+              if (event.delta?.type === "text_delta") {
+                textContent += event.delta.text;
+                sendChunk(event.delta.text);
+              } else if (event.delta?.type === "input_json_delta") {
+                inputJsonBuf += event.delta.partial_json;
+              }
+              break;
+
+            case "content_block_stop":
+              if (currentToolUse) {
+                try { currentToolUse.input = JSON.parse(inputJsonBuf || "{}"); } catch { currentToolUse.input = {}; }
+                toolUseBlocks.push(currentToolUse);
+                currentToolUse = null;
+                inputJsonBuf = "";
+              }
+              break;
+
+            case "message_delta":
+              if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
+              break;
+          }
         }
       }
+
+      // If Claude wants to use tools, execute them and continue the loop
+      if (stopReason === "tool_use" && toolUseBlocks.length > 0) {
+        const assistantContent = [];
+        if (textContent) assistantContent.push({ type: "text", text: textContent });
+        for (const tb of toolUseBlocks) {
+          assistantContent.push({ type: "tool_use", id: tb.id, name: tb.name, input: tb.input });
+        }
+        claudeMessages.push({ role: "assistant", content: assistantContent });
+
+        const toolResults = [];
+        for (const tb of toolUseBlocks) {
+          try {
+            const result = await executeTool(tb.name, tb.input, ctx);
+            const annotated = annotateDates(result, tz);
+            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(annotated) });
+          } catch (e) {
+            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify({ error: e.message }), is_error: true });
+          }
+        }
+        claudeMessages.push({ role: "user", content: toolResults });
+
+        toolUseBlocks = [];
+        textContent = "";
+        stopReason = null;
+        continue;
+      }
+
+      // Final text response — done
+      break;
     }
   } catch (e) {
     console.error("[eleven-webhook] Error:", e?.message, e?.stack);
