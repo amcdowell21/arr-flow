@@ -2,7 +2,7 @@ import Foundation
 
 enum APIConfig {
     // Point to your Vercel deployment
-    static let baseURL = "https://arr-flow.vercel.app"
+    static let baseURL = "https://arrflow.co"
 
     static var bobChatURL: URL {
         URL(string: "\(baseURL)/api/bob")!

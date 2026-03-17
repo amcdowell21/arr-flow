@@ -42,6 +42,30 @@ struct BobChatView: View {
             }
             .onTapGesture { inputFocused = false }
 
+            // Error banner
+            if let error = bobVM.errorMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(.red)
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    Spacer()
+                    Button {
+                        bobVM.errorMessage = nil
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.red.opacity(0.08))
+                .overlay(Rectangle().frame(height: 1), alignment: .top)
+            }
+
             Divider()
 
             // Input bar

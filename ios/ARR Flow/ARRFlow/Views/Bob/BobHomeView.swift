@@ -20,6 +20,29 @@ struct BobHomeView: View {
                     BobCallView()
                         .environmentObject(bobVM)
                 }
+
+                // Error toast for call/idle errors
+                if let error = bobVM.errorMessage, bobVM.mode != .chat {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundStyle(.red)
+                            Text(error)
+                                .font(.system(size: 13))
+                                .lineLimit(3)
+                            Spacer()
+                            Button { bobVM.errorMessage = nil } label: {
+                                Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
+                            }
+                        }
+                        .padding(14)
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 16)
+                    }
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

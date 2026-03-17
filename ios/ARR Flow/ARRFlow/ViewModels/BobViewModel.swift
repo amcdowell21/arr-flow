@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 enum BobMode {
     case idle
@@ -23,6 +24,19 @@ class BobViewModel: ObservableObject {
     private var currentTask: URLSessionDataTask?
     private let chatService = BobChatService.shared
     private let firestoreService = FirestoreService.shared
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // If VoiceCallService ends the call internally (e.g. WebSocket failure),
+        // isCallActive flips to false but mode would stay .call — sync it here.
+        VoiceCallService.shared.$isCallActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isActive in
+                guard let self, !isActive, self.mode == .call else { return }
+                self.mode = self.messages.isEmpty ? .idle : .chat
+            }
+            .store(in: &cancellables)
+    }
 
     var userId: String? {
         AuthService.shared.currentUserId
@@ -76,6 +90,8 @@ class BobViewModel: ObservableObject {
             },
             onDone: { [weak self] in
                 guard let self else { return }
+                // Guard against double-call (server sends "done" event, then connection closes)
+                guard self.isStreaming else { return }
                 if let lastIndex = self.messages.indices.last {
                     self.messages[lastIndex].isStreaming = false
                 }
@@ -83,9 +99,19 @@ class BobViewModel: ObservableObject {
                 self.activeTools = []
             },
             onError: { [weak self] error in
-                self?.isStreaming = false
-                self?.errorMessage = error.localizedDescription
-                self?.activeTools = []
+                guard let self else { return }
+                // Remove empty streaming placeholder so the typing indicator doesn't get stuck
+                if let lastIndex = self.messages.indices.last,
+                   self.messages[lastIndex].role == .assistant,
+                   self.messages[lastIndex].isStreaming,
+                   self.messages[lastIndex].content.isEmpty {
+                    self.messages.removeLast()
+                } else if let lastIndex = self.messages.indices.last {
+                    self.messages[lastIndex].isStreaming = false
+                }
+                self.isStreaming = false
+                self.errorMessage = error.localizedDescription
+                self.activeTools = []
             }
         )
     }
