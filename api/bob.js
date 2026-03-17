@@ -459,15 +459,36 @@ async function executeTool(name, input, ctx) {
 }
 
 // ─── System prompt ──────────────────────────────────────────────────────────
-function getDateContext() {
+function getDateContext(tz = "America/Chicago") {
   const now = new Date();
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const fmt = (d) => `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}`;
-  const iso = (d) => d.toISOString().split("T")[0];
+
+  // Resolve date parts in the user's timezone (NOT UTC)
+  const partsFor = (d) => {
+    const p = {};
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, year: "numeric", month: "numeric", day: "numeric", weekday: "short",
+    }).formatToParts(d).forEach(({ type, value }) => { p[type] = value; });
+    return p;
+  };
+  const weekdayIdx = (d) => {
+    const wd = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(d);
+    return days.indexOf(wd);
+  };
+  const fmt = (d) => {
+    const p = partsFor(d);
+    return `${days[weekdayIdx(d)]} ${months[parseInt(p.month) - 1]} ${parseInt(p.day)}`;
+  };
+  const iso = (d) => {
+    const p = partsFor(d);
+    return `${p.year}-${p.month.padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+  };
+
+  const todayISO = iso(now);
 
   // Build this week (Mon–Sun) and next week
-  const dayOfWeek = now.getDay(); // 0=Sun
+  const dayOfWeek = weekdayIdx(now); // 0=Sun
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(now);
   monday.setDate(now.getDate() + mondayOffset);
@@ -476,7 +497,7 @@ function getDateContext() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    const marker = iso(d) === iso(now) ? " ← TODAY" : "";
+    const marker = iso(d) === todayISO ? " ← TODAY" : "";
     weekLines += `  ${fmt(d)} (${iso(d)})${marker}\n`;
   }
   weekLines += "Next week:\n";
@@ -486,13 +507,13 @@ function getDateContext() {
     weekLines += `  ${fmt(d)} (${iso(d)})\n`;
   }
 
-  return `Today is ${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()} (${iso(now)})\n\n${weekLines}`;
+  return `Today is ${fmt(now)}, ${partsFor(now).year} (${todayISO})\n\n${weekLines}`;
 }
 
-function getSystemPrompt() {
+function getSystemPrompt(tz) {
   return `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help manage pipeline deals, track events, log outbound activity, and organize notes and follow-ups.
 
-${getDateContext()}
+${getDateContext(tz)}
 
 You have access to the platform's full data layer through tools. Use them proactively — if a user asks about their deals, call list_deals first. If they want to change something, use the appropriate update tool.
 
@@ -515,7 +536,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { conversationId, messages, userId, hsToken } = req.body;
+  const { conversationId, messages, userId, hsToken, timezone } = req.body;
   if (!messages || !userId) {
     return res.status(400).json({ error: "Missing messages or userId" });
   }
@@ -560,7 +581,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 4096,
-          system: getSystemPrompt(),
+          system: getSystemPrompt(timezone),
           tools: TOOLS,
           messages: claudeMessages,
           stream: true,

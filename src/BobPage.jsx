@@ -794,6 +794,7 @@ export default function BobPage({ currentUser, hsToken }) {
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           userId: currentUser.uid,
           hsToken: hsToken || localStorage.getItem("hs_token") || null,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
         signal: controller.signal,
       });

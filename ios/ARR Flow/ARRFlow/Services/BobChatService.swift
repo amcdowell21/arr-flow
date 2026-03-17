@@ -21,7 +21,8 @@ class BobChatService {
 
         var body: [String: Any] = [
             "messages": messages,
-            "userId": userId
+            "userId": userId,
+            "timezone": TimeZone.current.identifier
         ]
         if let cid = conversationId { body["conversationId"] = cid }
         if let token = APIConfig.hsToken { body["hsToken"] = token }
@@ -68,6 +69,16 @@ private class SSEDelegate: NSObject, URLSessionDataDelegate {
         self.onError = onError
     }
 
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            let msg = "Server error (\(http.statusCode)) — check Vercel logs"
+            onError(NSError(domain: "BobChat", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: msg]))
+            completionHandler(.cancel)
+        } else {
+            completionHandler(.allow)
+        }
+    }
+
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         guard let text = String(data: data, encoding: .utf8) else { return }
         buffer += text
@@ -81,9 +92,9 @@ private class SSEDelegate: NSObject, URLSessionDataDelegate {
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error {
+        if let error = error, (error as NSError).code != NSURLErrorCancelled {
             onError(error)
-        } else {
+        } else if error == nil {
             // Process remaining buffer
             if !buffer.isEmpty {
                 processSSEChunk(buffer)

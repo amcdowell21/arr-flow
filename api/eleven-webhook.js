@@ -373,17 +373,22 @@ async function executeTool(name, input, ctx) {
 }
 
 // ─── Date context ───────────────────────────────────────────────────────────
-function getDateContext() {
+function getDateContext(tz = "America/Chicago") {
   const now = new Date();
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  return `Today is ${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}.`;
+  const wd = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(now);
+  const p = {};
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, year: "numeric", month: "numeric", day: "numeric",
+  }).formatToParts(now).forEach(({ type, value }) => { p[type] = value; });
+  return `Today is ${wd}, ${months[parseInt(p.month) - 1]} ${parseInt(p.day)}, ${p.year}.`;
 }
 
-function getSystemPrompt() {
+function getSystemPrompt(tz) {
   return `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help manage pipeline deals, track events, log outbound activity, and organize notes.
 
-${getDateContext()}
+${getDateContext(tz)}
 
 You have tools to access the platform's data. Use them when the user asks about deals, pipeline, events, outbound, or notes.
 
@@ -412,6 +417,7 @@ export default async function handler(req, res) {
   // ElevenLabs passes dynamic variables we set during conversation init
   const userId = req.headers["x-user-id"] || "";
   const hsToken = req.headers["x-hs-token"] || "";
+  const timezone = req.headers["x-timezone"] || "America/Chicago";
   const ctx = { userId, hsToken };
 
   // Set up SSE streaming (OpenAI format)
@@ -453,7 +459,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1024, // Shorter for voice
-          system: getSystemPrompt(),
+          system: getSystemPrompt(timezone),
           tools: TOOLS,
           messages: claudeMessages,
           stream: true,
