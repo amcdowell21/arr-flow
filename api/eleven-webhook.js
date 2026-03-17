@@ -372,7 +372,27 @@ async function executeTool(name, input, ctx) {
   }
 }
 
-// ─── Date context ───────────────────────────────────────────────────────────
+// ─── Date helpers ───────────────────────────────────────────────────────────
+function dayOfWeekForISO(isoDate, tz = "America/Chicago") {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(date);
+}
+
+function annotateDates(obj, tz) {
+  if (!obj || typeof obj !== "object") return obj;
+  const result = Array.isArray(obj) ? [...obj] : { ...obj };
+  for (const key of Object.keys(result)) {
+    const val = result[key];
+    if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      result[key] = `${dayOfWeekForISO(val, tz)} ${val}`;
+    } else if (val && typeof val === "object") {
+      result[key] = annotateDates(val, tz);
+    }
+  }
+  return result;
+}
+
 function getDateContext(tz = "America/Chicago") {
   const now = new Date();
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -418,7 +438,8 @@ export default async function handler(req, res) {
   const userId = req.headers["x-user-id"] || "";
   const hsToken = req.headers["x-hs-token"] || "";
   const timezone = req.headers["x-timezone"] || "America/Chicago";
-  const ctx = { userId, hsToken };
+  const tz = timezone || "America/Chicago";
+  const ctx = { userId, hsToken, tz };
 
   // Set up SSE streaming (OpenAI format)
   res.writeHead(200, {
@@ -544,7 +565,8 @@ export default async function handler(req, res) {
         for (const tb of toolUseBlocks) {
           try {
             const result = await executeTool(tb.name, tb.input, ctx);
-            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(result) });
+            const annotated = annotateDates(result, tz);
+            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(annotated) });
           } catch (e) {
             toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify({ error: e.message }), is_error: true });
           }

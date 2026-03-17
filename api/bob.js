@@ -459,6 +459,29 @@ async function executeTool(name, input, ctx) {
 }
 
 // ─── System prompt ──────────────────────────────────────────────────────────
+// Returns the long weekday name for a YYYY-MM-DD string in the given timezone
+function dayOfWeekForISO(isoDate, tz = "America/Chicago") {
+  // Parse as local date in the timezone by using noon UTC to avoid DST edge cases
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(date);
+}
+
+// Annotate any date strings in follow-ups / deals with their day-of-week
+function annotateDates(obj, tz) {
+  if (!obj || typeof obj !== "object") return obj;
+  const result = Array.isArray(obj) ? [...obj] : { ...obj };
+  for (const key of Object.keys(result)) {
+    const val = result[key];
+    if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      result[key] = `${dayOfWeekForISO(val, tz)} ${val}`;
+    } else if (val && typeof val === "object") {
+      result[key] = annotateDates(val, tz);
+    }
+  }
+  return result;
+}
+
 function getDateContext(tz = "America/Chicago") {
   const now = new Date();
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -525,7 +548,10 @@ Data model context:
 - Follow-ups are date-based reminders linked to deals
 - Notes use a block editor with types: text, h1, h2, h3, bullet, numbered, todo, quote, code, divider
 
-IMPORTANT: When mentioning any date, you MUST look up the day-of-week from the calendar above. Do NOT compute or guess which day a date falls on — always reference the calendar. For example, if March 17 is listed as Tuesday in the calendar, say "Tuesday March 17", never "Monday March 17".
+CRITICAL DATE RULES — violating these is unacceptable:
+1. Dates in tool results are pre-annotated with their correct day-of-week (e.g. "Thursday 2026-03-19"). ALWAYS use the day-of-week exactly as it appears in the data. NEVER recompute or guess the day.
+2. For any other date, look it up in the calendar above. Do NOT compute days of the week yourself — you WILL get it wrong.
+3. If a date is not in the calendar and not in tool results, say just the date without a day name.
 
 Be concise and action-oriented. When you make changes, confirm what you did. Use markdown formatting for readability. When listing deals, format them in a clear table or list.`;
 }
@@ -557,7 +583,8 @@ export default async function handler(req, res) {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
-  const ctx = { userId, hsToken };
+  const tz = timezone || "America/Chicago";
+  const ctx = { userId, hsToken, tz };
 
   // Build Claude messages (only role + content)
   let claudeMessages = messages.map(m => ({
@@ -670,7 +697,8 @@ export default async function handler(req, res) {
           try {
             const result = await executeTool(tb.name, tb.input, ctx);
             send("tool", { name: tb.name, status: "done", summary: result.error || `Done` });
-            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(result) });
+            const annotated = annotateDates(result, tz);
+            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(annotated) });
           } catch (e) {
             send("tool", { name: tb.name, status: "error", summary: e.message });
             toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify({ error: e.message }), is_error: true });
