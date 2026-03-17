@@ -494,11 +494,26 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { messages } = req.body;
+  // Log the full request for debugging
+  console.log("[eleven-webhook] Headers:", JSON.stringify(req.headers));
+  console.log("[eleven-webhook] Body keys:", Object.keys(req.body || {}));
+  console.log("[eleven-webhook] Messages count:", req.body?.messages?.length);
+
+  const { messages } = req.body || {};
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
+    console.error("[eleven-webhook] No ANTHROPIC_API_KEY");
     return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+  }
+
+  if (!messages || !Array.isArray(messages)) {
+    console.error("[eleven-webhook] No messages array in body:", JSON.stringify(req.body).slice(0, 500));
+    // Return a valid OpenAI-format response even on error
+    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "Sorry, I didn't catch that." } }] })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    return res.end();
   }
 
   const userId = req.headers["x-user-id"] || "";
@@ -531,6 +546,8 @@ export default async function handler(req, res) {
       claudeMessages = [{ role: "user", content: "Hello" }, ...claudeMessages];
     }
 
+    console.log("[eleven-webhook] Calling Claude with", claudeMessages.length, "messages");
+
     // Single Claude call — no tools, no loops
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -550,7 +567,7 @@ export default async function handler(req, res) {
 
     if (!claudeRes.ok) {
       const errBody = await claudeRes.text();
-      console.error("Claude API error:", claudeRes.status, errBody);
+      console.error("[eleven-webhook] Claude API error:", claudeRes.status, errBody);
       sendChunk("Sorry, I'm having trouble right now.");
     } else {
       const reader = claudeRes.body.getReader();
@@ -579,7 +596,7 @@ export default async function handler(req, res) {
       }
     }
   } catch (e) {
-    console.error("Webhook error:", e?.message, e?.stack);
+    console.error("[eleven-webhook] Error:", e?.message, e?.stack);
     sendChunk("Sorry, something went wrong.");
   }
 
