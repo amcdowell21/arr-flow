@@ -316,10 +316,6 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
             allowInterruptions: true,
           },
         },
-        customLlmExtraBody: {
-          userId: currentUser?.uid || "",
-          hsToken: hsToken || "",
-        },
         clientTools: {
           list_deals: async () => {
             try {

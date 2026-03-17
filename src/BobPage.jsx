@@ -409,10 +409,6 @@ export default function BobPage({ currentUser, hsToken }) {
 
       const conversation = await Conversation.startSession({
         signedUrl,
-        customLlmExtraBody: {
-          userId: currentUser?.uid || "",
-          hsToken: hsToken || "",
-        },
         clientTools: {
           // These tools let the agent query real platform data from Firestore
           list_deals: async () => {

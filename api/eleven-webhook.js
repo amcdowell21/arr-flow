@@ -458,10 +458,19 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  // Extract userId and hsToken from customLlmExtraBody (passed via ElevenLabs SDK)
-  // Falls back to headers and env vars
-  const userId = req.body.userId || req.headers["x-user-id"] || "";
-  const hsToken = req.body.hsToken || req.headers["x-hs-token"] || process.env.HUBSPOT_TOKEN || "";
+  // Resolve userId — ElevenLabs doesn't forward custom headers, so fall back
+  // to looking up the active user from Firestore
+  let userId = req.headers["x-user-id"] || "";
+  if (!userId) {
+    try {
+      const db = getDb();
+      const usersSnap = await db.collection("users").where("active", "==", true).limit(1).get();
+      if (!usersSnap.empty) userId = usersSnap.docs[0].id;
+    } catch (e) {
+      console.error("[eleven-webhook] Failed to look up active user:", e.message);
+    }
+  }
+  const hsToken = req.headers["x-hs-token"] || process.env.HUBSPOT_TOKEN || "";
   console.log("[eleven-webhook] Resolved userId:", userId ? userId.slice(0, 8) + "..." : "(empty)");
 
   const timezone = req.headers["x-timezone"] || "America/Chicago";
