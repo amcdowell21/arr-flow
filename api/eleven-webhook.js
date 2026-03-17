@@ -405,19 +405,87 @@ function getDateContext(tz = "America/Chicago") {
   return `Today is ${wd}, ${months[parseInt(p.month) - 1]} ${parseInt(p.day)}, ${p.year}.`;
 }
 
-function getSystemPrompt(tz) {
-  return `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform. You help manage pipeline deals, track events, log outbound activity, and organize notes.
+// Pre-fetch all platform data and build a context string for the system prompt.
+// This eliminates tool calls entirely, making voice responses fast (~2s).
+async function fetchPlatformContext(userId, tz) {
+  const db = getDb();
+  const sections = [];
+
+  try {
+    // Deals
+    const dealsSnap = await db.collection("pipelineDeals").get();
+    const deals = dealsSnap.docs.map(d => {
+      const data = d.data();
+      return { name: data.name, value: data.value, bucket: data.bucket, expectedCloseMonth: data.expectedCloseMonth, confidence: data.manualConfidence ?? data.confidence, closedWon: data.closedWon || false, lastActivityDate: data.lastActivityDate };
+    });
+    const active = deals.filter(d => !d.closedWon && d.bucket === "active");
+    const won = deals.filter(d => d.closedWon);
+    const activeValue = active.reduce((s, d) => s + (d.value || 0), 0);
+    const wonValue = won.reduce((s, d) => s + (d.value || 0), 0);
+    let dealSummary = `PIPELINE: ${deals.length} total deals. ${active.length} active ($${activeValue.toLocaleString()}), ${won.length} closed won ($${wonValue.toLocaleString()}).`;
+    dealSummary += "\nActive deals: " + active.map(d => `${d.name} ($${(d.value||0).toLocaleString()}, ${d.confidence||0}% conf, close ${d.expectedCloseMonth||"TBD"})`).join("; ");
+    sections.push(dealSummary);
+  } catch (e) {
+    sections.push("PIPELINE: Could not load deals.");
+  }
+
+  try {
+    // Follow-ups
+    if (userId) {
+      const notesSnap = await db.collection("userNotes").doc(userId).get();
+      if (notesSnap.exists) {
+        const data = notesSnap.data();
+        const followUps = data.followUps || {};
+        const pending = Object.entries(followUps).filter(([, v]) => !v.completed);
+        if (pending.length > 0) {
+          const fuList = pending.map(([key, v]) => {
+            const day = v.date ? dayOfWeekForISO(v.date, tz) : "";
+            return `${v.dealName}: ${v.todoText} (${day} ${v.date || "no date"}) [key=${key}]`;
+          }).join("; ");
+          sections.push(`FOLLOW-UPS (${pending.length} pending): ${fuList}`);
+        } else {
+          sections.push("FOLLOW-UPS: None pending.");
+        }
+      }
+    }
+  } catch (e) {
+    sections.push("FOLLOW-UPS: Could not load.");
+  }
+
+  try {
+    // Events
+    const evSnap = await db.collection("pipelineEvents").get();
+    if (!evSnap.empty) {
+      const events = evSnap.docs.map(d => d.data());
+      sections.push("EVENTS: " + events.map(e => `${e.name} (${e.date}, ${e.peopleMet||0} met, ${e.convertedToMeeting||0} meetings)`).join("; "));
+    }
+  } catch (e) { /* skip */ }
+
+  try {
+    // Recent outbound
+    const obSnap = await db.collection("outboundActuals").get();
+    if (!obSnap.empty) {
+      const entries = obSnap.docs.map(d => d.data()).sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""));
+      const recent = entries.slice(0, 3);
+      sections.push("RECENT OUTBOUND: " + recent.map(e => `Wk ${e.weekOf}: ${e.touches||0} touches, ${e.bookings||0} bookings, ${e.held||0} held`).join("; "));
+    }
+  } catch (e) { /* skip */ }
+
+  return sections.join("\n\n");
+}
+
+function getSystemPrompt(tz, platformData) {
+  return `You are Bob, a friendly and concise revenue operations assistant for the arr-flow platform.
 
 ${getDateContext(tz)}
 
-You have tools to access the platform's data. Use them when the user asks about deals, pipeline, events, outbound, or notes.
+You are in a LIVE VOICE CALL. Keep responses SHORT and conversational — 1-3 sentences max. No markdown, no lists, no tables. Summarize data verbally. Be warm and natural.
 
-Keep responses SHORT and conversational — you're in a live voice call. Avoid long lists or markdown. Summarize data verbally. Be warm and natural.
+Here is the user's current platform data (pre-loaded, do NOT say you need to "check" or "look up" anything — you already have it):
 
-Data model:
-- Pipeline deals have buckets: active, future_q1q2, future_q3q4, renewal, untagged
-- Confidence is 0-100
-- expectedCloseMonth is YYYY-MM format`;
+${platformData}
+
+When mentioning dates, use the day-of-week exactly as shown in the data above. Never compute or guess day names yourself.`;
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────────
@@ -433,13 +501,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   }
 
-  // Extract userId and hsToken from custom headers or the system message
-  // ElevenLabs passes dynamic variables we set during conversation init
   const userId = req.headers["x-user-id"] || "";
-  const hsToken = req.headers["x-hs-token"] || "";
   const timezone = req.headers["x-timezone"] || "America/Chicago";
   const tz = timezone || "America/Chicago";
-  const ctx = { userId, hsToken, tz };
 
   // Set up SSE streaming (OpenAI format)
   res.writeHead(200, {
@@ -454,56 +518,44 @@ export default async function handler(req, res) {
   };
 
   try {
+    // Pre-fetch all data so Claude doesn't need tools (fast single call)
+    const platformData = await fetchPlatformContext(userId, tz);
+
     // Convert OpenAI messages to Claude format
-    // ElevenLabs sends: system message + user/assistant alternation
     let claudeMessages = [];
     for (const msg of messages) {
-      if (msg.role === "system") continue; // We use our own system prompt
+      if (msg.role === "system") continue;
       claudeMessages.push({ role: msg.role, content: msg.content });
     }
-
-    // Ensure messages start with user role
     if (claudeMessages.length === 0 || claudeMessages[0].role !== "user") {
       claudeMessages = [{ role: "user", content: "Hello" }, ...claudeMessages];
     }
 
-    // Agentic loop — Claude may call tools
-    let maxLoops = 3; // Fewer loops for voice (latency matters)
-    while (maxLoops-- > 0) {
-      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 512, // Shorter for voice
-          system: getSystemPrompt(timezone),
-          tools: TOOLS,
-          messages: claudeMessages,
-          stream: true,
-        }),
-      });
+    // Single Claude call — no tools, no loops
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        system: getSystemPrompt(tz, platformData),
+        messages: claudeMessages,
+        stream: true,
+      }),
+    });
 
-      if (!claudeRes.ok) {
-        const errBody = await claudeRes.text();
-        console.error("Claude API error:", claudeRes.status, errBody);
-        console.error("Messages sent:", JSON.stringify(claudeMessages));
-        sendChunk("Sorry, I'm having trouble connecting right now.");
-        break;
-      }
-
-      // Parse Claude SSE stream
+    if (!claudeRes.ok) {
+      const errBody = await claudeRes.text();
+      console.error("Claude API error:", claudeRes.status, errBody);
+      sendChunk("Sorry, I'm having trouble right now.");
+    } else {
       const reader = claudeRes.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let currentToolUse = null;
-      let toolUseBlocks = [];
-      let textContent = "";
-      let stopReason = null;
-      let inputJsonBuf = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -517,72 +569,14 @@ export default async function handler(req, res) {
           if (!line.startsWith("data: ")) continue;
           const data = line.slice(6).trim();
           if (data === "[DONE]") continue;
-
-          let event;
-          try { event = JSON.parse(data); } catch { continue; }
-
-          switch (event.type) {
-            case "content_block_start":
-              if (event.content_block?.type === "tool_use") {
-                currentToolUse = { id: event.content_block.id, name: event.content_block.name };
-                inputJsonBuf = "";
-              }
-              break;
-            case "content_block_delta":
-              if (event.delta?.type === "text_delta") {
-                textContent += event.delta.text;
-                // Stream text to ElevenLabs in real-time
-                sendChunk(event.delta.text);
-              } else if (event.delta?.type === "input_json_delta") {
-                inputJsonBuf += event.delta.partial_json;
-              }
-              break;
-            case "content_block_stop":
-              if (currentToolUse) {
-                try { currentToolUse.input = JSON.parse(inputJsonBuf || "{}"); } catch { currentToolUse.input = {}; }
-                toolUseBlocks.push(currentToolUse);
-                currentToolUse = null;
-                inputJsonBuf = "";
-              }
-              break;
-            case "message_delta":
-              if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
-              break;
-          }
-        }
-      }
-
-      // If Claude wants tools, execute them and continue
-      if (stopReason === "tool_use" && toolUseBlocks.length > 0) {
-        // Send a buffer phrase while processing tools
-        sendChunk("Let me check that... ");
-
-        const assistantContent = [];
-        if (textContent) assistantContent.push({ type: "text", text: textContent });
-        for (const tb of toolUseBlocks) {
-          assistantContent.push({ type: "tool_use", id: tb.id, name: tb.name, input: tb.input });
-        }
-        claudeMessages.push({ role: "assistant", content: assistantContent });
-
-        const toolResults = [];
-        for (const tb of toolUseBlocks) {
           try {
-            const result = await executeTool(tb.name, tb.input, ctx);
-            const annotated = annotateDates(result, tz);
-            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(annotated) });
-          } catch (e) {
-            toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify({ error: e.message }), is_error: true });
-          }
+            const event = JSON.parse(data);
+            if (event.delta?.type === "text_delta") {
+              sendChunk(event.delta.text);
+            }
+          } catch { continue; }
         }
-        claudeMessages.push({ role: "user", content: toolResults });
-
-        toolUseBlocks = [];
-        textContent = "";
-        stopReason = null;
-        continue;
       }
-
-      break;
     }
   } catch (e) {
     console.error("Webhook error:", e?.message, e?.stack);
