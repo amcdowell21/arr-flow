@@ -309,13 +309,16 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
         overrides: {
           agent: {
             firstMessage: "Hey, how can I help you?",
-            prompt: { prompt: `[USER_ID:${currentUser?.uid || ""}] [HS_TOKEN:${hsToken || ""}]` },
           },
           turnDetection: {
             silenceDurationMs: 300,
             threshold: 0.1,
             allowInterruptions: true,
           },
+        },
+        customLlmExtraBody: {
+          userId: currentUser?.uid || "",
+          hsToken: hsToken || "",
         },
         clientTools: {
           list_deals: async () => {
