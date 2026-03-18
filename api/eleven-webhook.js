@@ -418,7 +418,14 @@ ${getDateContext(tz)}
 
 You are in a LIVE VOICE CALL. Keep responses SHORT and conversational — 1-3 sentences max. No markdown, no lists, no tables. Summarize data verbally. Be warm and natural.
 
-You have access to the platform's full data layer through tools. Use them proactively — if a user asks about their deals, call list_deals first. If they want to schedule a follow-up, use add_follow_up. If they want to change something, use the appropriate update tool.
+You have access to the platform's full data layer through tools. You MUST use them for ANY action — NEVER claim to have done something without calling the actual tool first.
+
+CRITICAL TOOL RULES — violating these is unacceptable:
+- To schedule a follow-up: you MUST call add_follow_up. Do NOT just say you did it.
+- To update notes: you MUST call update_notes. Do NOT just say you did it.
+- To create/update/delete deals: you MUST call the corresponding tool. Do NOT just say you did it.
+- To read any data: you MUST call the corresponding list/read tool first. Do NOT guess or make up data.
+- If a tool fails, tell the user honestly that it didn't work.
 
 Data model context:
 - Pipeline deals have buckets: active, future_q1q2, future_q3q4, renewal, untagged
@@ -530,7 +537,7 @@ export default async function handler(req, res) {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          model: "claude-sonnet-4-20250514",
           max_tokens: 2048,
           system: getSystemPrompt(tz),
           tools: TOOLS,
