@@ -192,6 +192,7 @@ const TOOLS = [
 async function executeTool(name, input, ctx) {
   const db = getDb();
   const { userId, hsToken } = ctx;
+  console.log(`[eleven-webhook] TOOL CALL: ${name}, userId: ${userId || "(empty)"}, input: ${JSON.stringify(input).slice(0, 200)}`);
 
   switch (name) {
     case "list_deals": {
@@ -274,7 +275,11 @@ async function executeTool(name, input, ctx) {
       return { success: true };
     }
     case "add_follow_up": {
-      if (!userId) return { error: "No userId" };
+      if (!userId) {
+        console.error("[eleven-webhook] add_follow_up FAILED: no userId");
+        return { error: "No userId — cannot save follow-up" };
+      }
+      console.log("[eleven-webhook] add_follow_up: writing to userNotes/" + userId);
       const snap = await db.collection("userNotes").doc(userId).get();
       const followUps = snap.exists ? (snap.data().followUps || {}) : {};
       const key = `${input.dealName.replace(/\s+/g, "_")}_${Date.now()}`;
@@ -283,6 +288,7 @@ async function executeTool(name, input, ctx) {
         date: input.date, todoText: input.todoText, completed: false,
       };
       await db.collection("userNotes").doc(userId).set({ followUps }, { merge: true });
+      console.log("[eleven-webhook] add_follow_up SUCCESS: key=" + key);
       return { success: true, followUpKey: key };
     }
     case "complete_follow_up": {
@@ -464,14 +470,24 @@ export default async function handler(req, res) {
   if (!userId) {
     try {
       const db = getDb();
-      const usersSnap = await db.collection("users").where("active", "==", true).limit(1).get();
-      if (!usersSnap.empty) userId = usersSnap.docs[0].id;
+      // Try active users first
+      let usersSnap = await db.collection("users").where("active", "==", true).limit(1).get();
+      if (usersSnap.empty) {
+        // Fallback: get any user
+        usersSnap = await db.collection("users").limit(1).get();
+      }
+      if (!usersSnap.empty) {
+        userId = usersSnap.docs[0].id;
+        console.log("[eleven-webhook] Resolved userId from Firestore:", userId);
+      } else {
+        console.error("[eleven-webhook] No users found in Firestore users collection");
+      }
     } catch (e) {
-      console.error("[eleven-webhook] Failed to look up active user:", e.message);
+      console.error("[eleven-webhook] Failed to look up user:", e.message);
     }
   }
   const hsToken = req.headers["x-hs-token"] || process.env.HUBSPOT_TOKEN || "";
-  console.log("[eleven-webhook] Resolved userId:", userId ? userId.slice(0, 8) + "..." : "(empty)");
+  console.log("[eleven-webhook] userId:", userId || "(empty)", "hsToken:", hsToken ? "present" : "missing");
 
   const timezone = req.headers["x-timezone"] || "America/Chicago";
   const tz = timezone || "America/Chicago";
@@ -602,9 +618,11 @@ export default async function handler(req, res) {
         for (const tb of toolUseBlocks) {
           try {
             const result = await executeTool(tb.name, tb.input, ctx);
+            console.log(`[eleven-webhook] Tool ${tb.name} result:`, JSON.stringify(result).slice(0, 300));
             const annotated = annotateDates(result, tz);
             toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify(annotated) });
           } catch (e) {
+            console.error(`[eleven-webhook] Tool ${tb.name} EXCEPTION:`, e.message);
             toolResults.push({ type: "tool_result", tool_use_id: tb.id, content: JSON.stringify({ error: e.message }), is_error: true });
           }
         }
