@@ -272,9 +272,20 @@ export default function BobFloat({ currentUser, hsToken, currentView }) {
 
   // ─── Start call ─────────────────────────────────────────────────────
   const startCall = useCallback(async () => {
+    // Write userId to Firestore so the webhook knows who's calling
+    console.log("[BobFloat] currentUser.uid:", currentUser?.uid || "(none)");
+    if (currentUser?.uid) {
+      try {
+        await setDoc(doc(db, "pendingCalls", "latest"), { userId: currentUser.uid, updatedAt: Date.now() });
+        console.log("[BobFloat] pendingCalls/latest written OK");
+      } catch (e) {
+        console.error("[BobFloat] Failed to write pendingCalls/latest:", e.message);
+      }
+    }
+
     let signedUrl;
     try {
-      const res = await fetch(`/api/eleven-signed-url?userId=${currentUser?.uid || ""}`);
+      const res = await fetch("/api/eleven-signed-url");
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const data = await res.json();
       signedUrl = data.signed_url;

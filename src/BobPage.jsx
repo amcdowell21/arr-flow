@@ -362,17 +362,26 @@ export default function BobPage({ currentUser, hsToken }) {
   const micLevelPollRef = useRef(null);
 
   const startCall = useCallback(async () => {
-    // Get signed WebSocket URL from our API
+    // Write userId to Firestore so the webhook knows who's calling
+    console.log("[Bob Call] currentUser.uid:", currentUser?.uid || "(none)");
+    if (currentUser?.uid) {
+      try {
+        await setDoc(doc(db, "pendingCalls", "latest"), { userId: currentUser.uid, updatedAt: Date.now() });
+        console.log("[Bob Call] pendingCalls/latest written OK");
+      } catch (e) {
+        console.error("[Bob Call] Failed to write pendingCalls/latest:", e.message);
+      }
+    }
+
     console.log("[Bob Call] Getting signed URL...");
     let signedUrl, voiceId;
     try {
-      console.log("[Bob Call] currentUser.uid:", currentUser?.uid || "(none)");
-      const res = await fetch(`/api/eleven-signed-url?userId=${currentUser?.uid || ""}`);
+      const res = await fetch("/api/eleven-signed-url");
       if (!res.ok) throw new Error(`Failed to get signed URL: ${res.status}`);
       const data = await res.json();
       signedUrl = data.signed_url;
       voiceId = data.voice_id;
-      console.log("[Bob Call] Got signed URL, voice:", voiceId, "userId sent:", currentUser?.uid || "(none)");
+      console.log("[Bob Call] Got signed URL, voice:", voiceId);
     } catch (e) {
       console.error("[Bob Call] Signed URL error:", e);
       return;

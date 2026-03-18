@@ -83,6 +83,10 @@ service cloud.firestore {
       allow read, write: if isActiveUser() && request.auth.uid == uid;
     }
 
+    match /pendingCalls/{docId} {
+      allow read, write: if isActiveUser();
+    }
+
     match /bobConversations/{convId} {
       allow read: if isActiveUser()
         && resource.data.userId == request.auth.uid;
