@@ -366,7 +366,7 @@ export default function BobPage({ currentUser, hsToken }) {
     console.log("[Bob Call] Getting signed URL...");
     let signedUrl, voiceId;
     try {
-      const res = await fetch("/api/eleven-signed-url");
+      const res = await fetch(`/api/eleven-signed-url?userId=${currentUser?.uid || ""}`);
       if (!res.ok) throw new Error(`Failed to get signed URL: ${res.status}`);
       const data = await res.json();
       signedUrl = data.signed_url;

@@ -471,26 +471,21 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  // Resolve userId — ElevenLabs doesn't forward custom headers, so fall back
-  // to looking up the active user from Firestore
+  // Resolve userId — ElevenLabs doesn't forward custom headers, so we store it
+  // in Firestore when the signed URL is requested, then read it here.
   let userId = req.headers["x-user-id"] || "";
   if (!userId) {
     try {
       const db = getDb();
-      // Try active users first
-      let usersSnap = await db.collection("users").where("active", "==", true).limit(1).get();
-      if (usersSnap.empty) {
-        // Fallback: get any user
-        usersSnap = await db.collection("users").limit(1).get();
-      }
-      if (!usersSnap.empty) {
-        userId = usersSnap.docs[0].id;
-        console.log("[eleven-webhook] Resolved userId from Firestore:", userId);
+      const pending = await db.collection("pendingCalls").doc("latest").get();
+      if (pending.exists && pending.data().userId) {
+        userId = pending.data().userId;
+        console.log("[eleven-webhook] Resolved userId from pendingCalls:", userId);
       } else {
-        console.error("[eleven-webhook] No users found in Firestore users collection");
+        console.error("[eleven-webhook] No pending call found in Firestore");
       }
     } catch (e) {
-      console.error("[eleven-webhook] Failed to look up user:", e.message);
+      console.error("[eleven-webhook] Failed to look up pending call:", e.message);
     }
   }
   const hsToken = req.headers["x-hs-token"] || process.env.HUBSPOT_TOKEN || "";
