@@ -42,15 +42,20 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // Store the userId so the webhook can look it up by conversation
+    // Store the userId so the webhook can look it up
     const userId = req.query.userId;
+    console.log("[signed-url] userId from query:", userId || "(none)");
     if (userId) {
       try {
         const db = getDb();
+        console.log("[signed-url] Writing pendingCalls/latest for userId:", userId);
         await db.collection("pendingCalls").doc("latest").set({ userId, updatedAt: Date.now() });
+        console.log("[signed-url] pendingCalls/latest written successfully");
       } catch (e) {
-        console.error("Failed to store pending call userId:", e.message);
+        console.error("[signed-url] FAILED to write pendingCalls/latest:", e.message, e.stack);
       }
+    } else {
+      console.error("[signed-url] No userId passed — tool calls will fail!");
     }
 
     return res.status(200).json({

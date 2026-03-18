@@ -366,12 +366,13 @@ export default function BobPage({ currentUser, hsToken }) {
     console.log("[Bob Call] Getting signed URL...");
     let signedUrl, voiceId;
     try {
+      console.log("[Bob Call] currentUser.uid:", currentUser?.uid || "(none)");
       const res = await fetch(`/api/eleven-signed-url?userId=${currentUser?.uid || ""}`);
       if (!res.ok) throw new Error(`Failed to get signed URL: ${res.status}`);
       const data = await res.json();
       signedUrl = data.signed_url;
       voiceId = data.voice_id;
-      console.log("[Bob Call] Got signed URL, voice:", voiceId);
+      console.log("[Bob Call] Got signed URL, voice:", voiceId, "userId sent:", currentUser?.uid || "(none)");
     } catch (e) {
       console.error("[Bob Call] Signed URL error:", e);
       return;
@@ -496,17 +497,19 @@ export default function BobPage({ currentUser, hsToken }) {
             } catch (e) { return "Error updating notes: " + e.message; }
           },
           add_follow_up: async ({ dealId, dealName, date, todoText }) => {
-            console.log("[Bob Call] Tool: add_follow_up");
+            console.log("[Bob Call] Tool: add_follow_up called", { dealId, dealName, date, todoText, uid: currentUser?.uid });
             try {
-              if (!currentUser) return "No user logged in.";
+              if (!currentUser) { console.error("[Bob Call] add_follow_up: no currentUser!"); return "No user logged in."; }
               const ref = doc(db, "userNotes", currentUser.uid);
               const snap = await getDoc(ref);
+              console.log("[Bob Call] add_follow_up: userNotes doc exists?", snap.exists());
               const followUps = snap.exists() ? (snap.data().followUps || {}) : {};
               const key = `${dealName.replace(/\s+/g, "_")}_${Date.now()}`;
               followUps[key] = { dealId: dealId || null, dealName, date, todoText, completed: false };
               await setDoc(ref, { followUps }, { merge: true });
+              console.log("[Bob Call] add_follow_up SUCCESS, key:", key);
               return `Follow-up scheduled for ${dealName} on ${date}: ${todoText}`;
-            } catch (e) { return "Error adding follow-up: " + e.message; }
+            } catch (e) { console.error("[Bob Call] add_follow_up ERROR:", e); return "Error adding follow-up: " + e.message; }
           },
           complete_follow_up: async ({ followUpKey }) => {
             console.log("[Bob Call] Tool: complete_follow_up");

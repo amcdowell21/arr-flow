@@ -275,21 +275,29 @@ async function executeTool(name, input, ctx) {
       return { success: true };
     }
     case "add_follow_up": {
+      console.log("[eleven-webhook] add_follow_up called, userId:", userId || "(EMPTY)", "input:", JSON.stringify(input));
       if (!userId) {
-        console.error("[eleven-webhook] add_follow_up FAILED: no userId");
+        console.error("[eleven-webhook] add_follow_up FAILED: no userId — pendingCalls lookup must have failed");
         return { error: "No userId — cannot save follow-up" };
       }
-      console.log("[eleven-webhook] add_follow_up: writing to userNotes/" + userId);
-      const snap = await db.collection("userNotes").doc(userId).get();
-      const followUps = snap.exists ? (snap.data().followUps || {}) : {};
-      const key = `${input.dealName.replace(/\s+/g, "_")}_${Date.now()}`;
-      followUps[key] = {
-        dealId: input.dealId || null, dealName: input.dealName,
-        date: input.date, todoText: input.todoText, completed: false,
-      };
-      await db.collection("userNotes").doc(userId).set({ followUps }, { merge: true });
-      console.log("[eleven-webhook] add_follow_up SUCCESS: key=" + key);
-      return { success: true, followUpKey: key };
+      try {
+        console.log("[eleven-webhook] add_follow_up: reading userNotes/" + userId);
+        const snap = await db.collection("userNotes").doc(userId).get();
+        console.log("[eleven-webhook] add_follow_up: doc exists?", snap.exists);
+        const followUps = snap.exists ? (snap.data().followUps || {}) : {};
+        const key = `${(input.dealName || "deal").replace(/\s+/g, "_")}_${Date.now()}`;
+        followUps[key] = {
+          dealId: input.dealId || null, dealName: input.dealName,
+          date: input.date, todoText: input.todoText, completed: false,
+        };
+        console.log("[eleven-webhook] add_follow_up: writing key:", key, "data:", JSON.stringify(followUps[key]));
+        await db.collection("userNotes").doc(userId).set({ followUps }, { merge: true });
+        console.log("[eleven-webhook] add_follow_up SUCCESS: key=" + key);
+        return { success: true, followUpKey: key };
+      } catch (e) {
+        console.error("[eleven-webhook] add_follow_up EXCEPTION:", e.message, e.stack);
+        return { error: "Firestore write failed: " + e.message };
+      }
     }
     case "complete_follow_up": {
       if (!userId) return { error: "No userId" };
