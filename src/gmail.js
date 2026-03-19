@@ -109,6 +109,10 @@ export async function listMessagesWithMetadata(uid, q = "", maxResults = 20, pag
   return gmailGet(uid, "list_with_metadata", params);
 }
 
+export async function getThread(uid, threadId) {
+  return gmailGet(uid, "thread", { threadId });
+}
+
 export async function getMessage(uid, messageId) {
   const msg = await gmailGet(uid, "get", { id: messageId });
   return {

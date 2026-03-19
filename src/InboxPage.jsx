@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { db } from "./firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, query, where, serverTimestamp } from "firebase/firestore";
-import { listMessagesWithMetadata, getMessage, sendMessage, createDraft } from "./gmail";
+import { listMessagesWithMetadata, getThread, sendMessage, createDraft } from "./gmail";
 
 // ─── Google Connection Banner ───────────────────────────────────────────────
 function ConnectBanner({ uid }) {
@@ -228,7 +228,8 @@ export default function InboxPage({ currentUser }) {
   const [googleEmail, setGoogleEmail] = useState("");
   const [messages, setMessages] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [selectedMsg, setSelectedMsg] = useState(null);
+  const [selectedThreadId, setSelectedThreadId] = useState(null);
+  const [threadMessages, setThreadMessages] = useState([]);
   const [loadingList, setLoadingList] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState(false);
   const [tab, setTab] = useState("inbox"); // inbox, sent, drafts
@@ -293,15 +294,15 @@ export default function InboxPage({ currentUser }) {
     if (connected) fetchMessages();
   }, [connected, tab]);
 
-  // Fetch full message when selected
+  // Fetch full thread when a message is selected
   useEffect(() => {
-    if (!selectedId || !uid) { setSelectedMsg(null); return; }
+    if (!selectedThreadId || !uid) { setThreadMessages([]); return; }
     setLoadingMsg(true);
-    getMessage(uid, selectedId).then(msg => {
-      setSelectedMsg(msg);
+    getThread(uid, selectedThreadId).then(data => {
+      setThreadMessages(data.messages || []);
       setLoadingMsg(false);
-    }).catch(() => setLoadingMsg(false));
-  }, [selectedId, uid]);
+    }).catch(() => { setThreadMessages([]); setLoadingMsg(false); });
+  }, [selectedThreadId, uid]);
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -399,7 +400,7 @@ export default function InboxPage({ currentUser }) {
             {tabs.map(t => (
               <button
                 key={t.id}
-                onClick={() => { setTab(t.id); setSelectedId(null); setMessages([]); }}
+                onClick={() => { setTab(t.id); setSelectedId(null); setSelectedThreadId(null); setThreadMessages([]); setMessages([]); }}
                 style={{
                   flex: 1, padding: "6px 0", fontSize: 12, fontWeight: 600, border: "none",
                   borderRadius: 6, cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
@@ -452,7 +453,7 @@ export default function InboxPage({ currentUser }) {
             return (
               <button
                 key={msg.id}
-                onClick={() => setSelectedId(msg.id)}
+                onClick={() => { setSelectedId(msg.id); setSelectedThreadId(msg.threadId); }}
                 style={{
                   width: "100%", textAlign: "left", display: "flex", flexDirection: "column",
                   padding: "12px 16px", gap: 3, border: "none", cursor: "pointer",
@@ -516,7 +517,7 @@ export default function InboxPage({ currentUser }) {
         </div>
       </div>
 
-      {/* Right panel — email reader */}
+      {/* Right panel — thread view */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
         {!selectedId && (
           <div style={{
@@ -534,119 +535,146 @@ export default function InboxPage({ currentUser }) {
             Loading...
           </div>
         )}
-        {selectedId && !loadingMsg && selectedMsg && (
-          <>
-            {/* Email header */}
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)" }}>
-              <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", margin: "0 0 12px" }}>
-                {selectedMsg.subject || "(no subject)"}
-              </h3>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                {/* Avatar */}
-                <div style={{
-                  width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-                  background: "#6366f1", display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#fff", fontSize: 14, fontWeight: 700,
-                }}>
-                  {parseSender(selectedMsg.from)?.[0]?.toUpperCase() || "?"}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{parseSender(selectedMsg.from)}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 1 }}>
-                    To: {selectedMsg.to}
-                    {selectedMsg.cc && <> &middot; Cc: {selectedMsg.cc}</>}
+        {selectedId && !loadingMsg && threadMessages.length > 0 && (() => {
+          const lastMsg = threadMessages[threadMessages.length - 1];
+          const threadSubject = threadMessages[0]?.subject || "(no subject)";
+          return (
+            <>
+              {/* Thread header */}
+              <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", margin: 0, flex: 1 }}>
+                    {threadSubject}
+                  </h3>
+                  {/* Deal tag */}
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    {dealTags[selectedId] ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, background: "rgba(99,102,241,0.15)",
+                          color: "#a5b4fc", borderRadius: 4, padding: "4px 8px",
+                        }}>
+                          {dealTags[selectedId].dealName}
+                        </span>
+                        <button onClick={() => handleUntagDeal(selectedId)} style={{
+                          background: "none", border: "none", color: "var(--text-faint)",
+                          cursor: "pointer", fontSize: 14, padding: 0,
+                        }}>&times;</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowDealPicker(p => !p)}
+                        style={{
+                          background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6,
+                          padding: "6px 12px", fontSize: 11, color: "#6366f1", cursor: "pointer",
+                          fontFamily: "'DM Sans',sans-serif", fontWeight: 600,
+                        }}
+                      >
+                        Tag Deal
+                      </button>
+                    )}
+                    {showDealPicker && (
+                      <DealTagPicker
+                        onSelect={handleTagDeal}
+                        onClose={() => setShowDealPicker(false)}
+                      />
+                    )}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, color: "var(--text-faint)", flexShrink: 0, fontFamily: "'DM Mono',monospace" }}>
-                  {formatDate(selectedMsg.date)}
-                </span>
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "center" }}>
-                <button
-                  onClick={() => {
-                    const fromEmail = selectedMsg.from?.match(/<([^>]+)>/)?.[1] || selectedMsg.from;
-                    setReplyTo({
-                      replyTo: fromEmail,
-                      subject: selectedMsg.subject,
-                      messageId: selectedMsg.messageId,
-                    });
-                    setComposeOpen(true);
-                  }}
-                  style={{
-                    background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6,
-                    padding: "6px 12px", fontSize: 11, color: "var(--text-secondary)", cursor: "pointer",
-                    fontFamily: "'DM Sans',sans-serif", fontWeight: 500,
-                  }}
-                >
-                  Reply
-                </button>
-                <button
-                  onClick={() => {
-                    setReplyTo(null);
-                    setComposeOpen(true);
-                    // Pre-fill forward
-                  }}
-                  style={{
-                    background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6,
-                    padding: "6px 12px", fontSize: 11, color: "var(--text-secondary)", cursor: "pointer",
-                    fontFamily: "'DM Sans',sans-serif", fontWeight: 500,
-                  }}
-                >
-                  Forward
-                </button>
-
-                {/* Deal tag */}
-                <div style={{ position: "relative", marginLeft: "auto" }}>
-                  {dealTags[selectedMsg.id] ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, background: "rgba(99,102,241,0.15)",
-                        color: "#a5b4fc", borderRadius: 4, padding: "4px 8px",
-                      }}>
-                        {dealTags[selectedMsg.id].dealName}
-                      </span>
-                      <button onClick={() => handleUntagDeal(selectedMsg.id)} style={{
-                        background: "none", border: "none", color: "var(--text-faint)",
-                        cursor: "pointer", fontSize: 14, padding: 0,
-                      }}>&times;</button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowDealPicker(p => !p)}
-                      style={{
-                        background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6,
-                        padding: "6px 12px", fontSize: 11, color: "#6366f1", cursor: "pointer",
-                        fontFamily: "'DM Sans',sans-serif", fontWeight: 600,
-                      }}
-                    >
-                      Tag Deal
-                    </button>
-                  )}
-                  {showDealPicker && (
-                    <DealTagPicker
-                      onSelect={handleTagDeal}
-                      onClose={() => setShowDealPicker(false)}
-                    />
-                  )}
+                <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
+                  {threadMessages.length} message{threadMessages.length !== 1 ? "s" : ""} in this thread
                 </div>
               </div>
-            </div>
 
-            {/* Email body */}
-            <div style={{ flex: 1, overflow: "auto", padding: "20px 24px" }}>
-              <div
-                style={{
-                  fontSize: 13, lineHeight: 1.7, color: "var(--text-secondary)",
-                  fontFamily: "'DM Sans',sans-serif",
-                  wordBreak: "break-word",
-                }}
-                dangerouslySetInnerHTML={{ __html: selectedMsg.body }}
-              />
-            </div>
-          </>
-        )}
+              {/* Thread messages */}
+              <div style={{ flex: 1, overflow: "auto" }}>
+                {threadMessages.map((msg, idx) => {
+                  const isLast = idx === threadMessages.length - 1;
+                  const [expanded, setExpanded] = [true, null]; // All expanded by default for now
+                  return (
+                    <div key={msg.id} style={{
+                      borderBottom: !isLast ? "1px solid var(--border)" : "none",
+                    }}>
+                      {/* Message header */}
+                      <div style={{
+                        display: "flex", alignItems: "flex-start", gap: 10, padding: "14px 24px 8px",
+                      }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                          background: msg.from?.includes(googleEmail) ? "#14b8a6" : "#6366f1",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "#fff", fontSize: 12, fontWeight: 700,
+                        }}>
+                          {parseSender(msg.from)?.[0]?.toUpperCase() || "?"}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
+                              {parseSender(msg.from)}
+                            </span>
+                            {msg.from?.includes(googleEmail) && (
+                              <span style={{ fontSize: 9, color: "#14b8a6", fontWeight: 600, background: "rgba(20,184,166,0.12)", borderRadius: 3, padding: "1px 5px" }}>You</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 1 }}>
+                            To: {msg.to}
+                            {msg.cc && <> &middot; Cc: {msg.cc}</>}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 10, color: "var(--text-faint)", flexShrink: 0, fontFamily: "'DM Mono',monospace" }}>
+                          {formatDate(msg.date)}
+                        </span>
+                      </div>
+
+                      {/* Message body */}
+                      <div style={{ padding: "4px 24px 16px 66px" }}>
+                        <div
+                          style={{
+                            fontSize: 13, lineHeight: 1.7, color: "var(--text-secondary)",
+                            fontFamily: "'DM Sans',sans-serif", wordBreak: "break-word",
+                          }}
+                          dangerouslySetInnerHTML={{ __html: msg.body }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Reply button at bottom of thread */}
+                <div style={{ padding: "16px 24px 24px", display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => {
+                      const fromEmail = lastMsg.from?.match(/<([^>]+)>/)?.[1] || lastMsg.from;
+                      setReplyTo({
+                        replyTo: fromEmail,
+                        subject: lastMsg.subject,
+                        messageId: lastMsg.messageId,
+                      });
+                      setComposeOpen(true);
+                    }}
+                    style={{
+                      background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
+                      padding: "10px 20px", fontSize: 12, color: "var(--text-secondary)", cursor: "pointer",
+                      fontFamily: "'DM Sans',sans-serif", fontWeight: 600,
+                    }}
+                  >
+                    Reply
+                  </button>
+                  <button
+                    onClick={() => { setReplyTo(null); setComposeOpen(true); }}
+                    style={{
+                      background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
+                      padding: "10px 20px", fontSize: 12, color: "var(--text-secondary)", cursor: "pointer",
+                      fontFamily: "'DM Sans',sans-serif", fontWeight: 500,
+                    }}
+                  >
+                    Forward
+                  </button>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Compose modal */}

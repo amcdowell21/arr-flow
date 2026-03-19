@@ -122,6 +122,57 @@ export default async function handler(req, res) {
         return res.json(await r.json());
       }
 
+      case "thread": {
+        const threadId = req.query.threadId;
+        if (!threadId) return res.status(400).json({ error: "Missing threadId" });
+        const r = await fetch(`${base}/threads/${threadId}?format=full`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) throw new Error(`Gmail thread error (${r.status})`);
+        const thread = await r.json();
+        const getH = (headers, name) => (headers || []).find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+
+        // Parse each message in the thread
+        function extractBody(payload) {
+          if (!payload) return "";
+          if (payload.body?.data) {
+            return Buffer.from(payload.body.data, "base64url").toString("utf-8");
+          }
+          const parts = payload.parts || [];
+          for (const part of parts) {
+            if (part.mimeType === "text/html" && part.body?.data) {
+              return Buffer.from(part.body.data, "base64url").toString("utf-8");
+            }
+          }
+          for (const part of parts) {
+            if (part.mimeType === "text/plain" && part.body?.data) {
+              return Buffer.from(part.body.data, "base64url").toString("utf-8").replace(/\n/g, "<br>");
+            }
+            if (part.parts) {
+              const nested = extractBody(part);
+              if (nested) return nested;
+            }
+          }
+          return "";
+        }
+
+        const messages = (thread.messages || []).map(msg => ({
+          id: msg.id,
+          threadId: msg.threadId,
+          from: getH(msg.payload?.headers, "From"),
+          to: getH(msg.payload?.headers, "To"),
+          cc: getH(msg.payload?.headers, "Cc"),
+          subject: getH(msg.payload?.headers, "Subject"),
+          date: getH(msg.payload?.headers, "Date"),
+          messageId: getH(msg.payload?.headers, "Message-ID"),
+          body: extractBody(msg.payload),
+          labelIds: msg.labelIds,
+          isUnread: (msg.labelIds || []).includes("UNREAD"),
+        }));
+
+        return res.json({ threadId, messages });
+      }
+
       case "send": {
         const { raw } = req.body;
         if (!raw) return res.status(400).json({ error: "Missing raw message" });
