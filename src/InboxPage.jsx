@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { db } from "./firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, query, where, serverTimestamp } from "firebase/firestore";
-import { listMessagesWithMetadata, getThread, sendMessage, createDraft } from "./gmail";
+import {
+  listMessagesWithMetadata, getThread, sendMessage, createDraft,
+  trashThread, archiveThread, starThread, unstarThread,
+  markThreadRead, markThreadUnread, listLabels, modifyThread,
+} from "./gmail";
 
 // ─── Google Connection Banner ───────────────────────────────────────────────
 function ConnectBanner({ uid }) {
@@ -239,6 +243,10 @@ export default function InboxPage({ currentUser }) {
   const [nextPageToken, setNextPageToken] = useState(null);
   const [dealTags, setDealTags] = useState({}); // { messageId: { dealId, dealName } }
   const [showDealPicker, setShowDealPicker] = useState(false);
+  const [gmailLabels, setGmailLabels] = useState([]);
+  const [showLabelPicker, setShowLabelPicker] = useState(false);
+  const [showSnoozeMenu, setShowSnoozeMenu] = useState(false);
+  const [snoozeReminders, setSnoozeReminders] = useState({}); // { threadId: { date, subject } }
 
   const uid = currentUser?.uid;
 
@@ -267,6 +275,33 @@ export default function InboxPage({ currentUser }) {
     });
   }, [uid]);
 
+  // Load Gmail labels
+  useEffect(() => {
+    if (!uid || !connected) return;
+    listLabels(uid).then(data => {
+      // Filter to user-created labels + useful system ones
+      const useful = (data.labels || []).filter(l =>
+        l.type === "user" || ["STARRED", "IMPORTANT", "SPAM"].includes(l.id)
+      );
+      setGmailLabels(useful);
+    }).catch(() => {});
+  }, [uid, connected]);
+
+  // Load snooze reminders from Firestore
+  useEffect(() => {
+    if (!uid) return;
+    getDocs(collection(db, "emailReminders")).then(snap => {
+      const reminders = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (data.userId === uid && data.status === "pending") {
+          reminders[data.threadId] = { ...data, docId: d.id };
+        }
+      });
+      setSnoozeReminders(reminders);
+    }).catch(() => {});
+  }, [uid]);
+
   // Fetch messages
   const fetchMessages = useCallback(async (pageToken) => {
     if (!uid || !connected) return;
@@ -275,6 +310,8 @@ export default function InboxPage({ currentUser }) {
       let q = searchQuery;
       if (tab === "sent") q = "in:sent " + q;
       else if (tab === "drafts") q = "in:drafts " + q;
+      else if (tab === "starred") q = "is:starred " + q;
+      else if (tab === "trash") q = "in:trash " + q;
       else if (!q) q = "in:inbox";
 
       const data = await listMessagesWithMetadata(uid, q.trim(), 25, pageToken || "");
@@ -336,6 +373,102 @@ export default function InboxPage({ currentUser }) {
     setDealTags(prev => { const n = { ...prev }; delete n[messageId]; return n; });
   }
 
+  // ─── Thread actions ─────────────────────────────────────────────────────
+  async function handleTrash() {
+    if (!selectedThreadId) return;
+    try {
+      await trashThread(uid, selectedThreadId);
+      setMessages(prev => prev.filter(m => m.threadId !== selectedThreadId));
+      setSelectedId(null);
+      setSelectedThreadId(null);
+      setThreadMessages([]);
+    } catch (e) { alert("Failed to delete: " + e.message); }
+  }
+
+  async function handleArchive() {
+    if (!selectedThreadId) return;
+    try {
+      await archiveThread(uid, selectedThreadId);
+      setMessages(prev => prev.filter(m => m.threadId !== selectedThreadId));
+      setSelectedId(null);
+      setSelectedThreadId(null);
+      setThreadMessages([]);
+    } catch (e) { alert("Failed to archive: " + e.message); }
+  }
+
+  async function handleToggleStar() {
+    if (!selectedThreadId) return;
+    const firstMsg = messages.find(m => m.threadId === selectedThreadId);
+    const isStarred = firstMsg?.labelIds?.includes("STARRED");
+    try {
+      if (isStarred) await unstarThread(uid, selectedThreadId);
+      else await starThread(uid, selectedThreadId);
+      // Update local state
+      setMessages(prev => prev.map(m => {
+        if (m.threadId !== selectedThreadId) return m;
+        const ids = new Set(m.labelIds || []);
+        if (isStarred) ids.delete("STARRED"); else ids.add("STARRED");
+        return { ...m, labelIds: [...ids] };
+      }));
+    } catch (e) { alert("Failed to star: " + e.message); }
+  }
+
+  async function handleToggleRead() {
+    if (!selectedThreadId) return;
+    const firstMsg = messages.find(m => m.threadId === selectedThreadId);
+    const isUnread = firstMsg?.isUnread;
+    try {
+      if (isUnread) await markThreadRead(uid, selectedThreadId);
+      else await markThreadUnread(uid, selectedThreadId);
+      setMessages(prev => prev.map(m => {
+        if (m.threadId !== selectedThreadId) return m;
+        const ids = new Set(m.labelIds || []);
+        if (isUnread) ids.delete("UNREAD"); else ids.add("UNREAD");
+        return { ...m, labelIds: [...ids], isUnread: !isUnread };
+      }));
+    } catch (e) { alert("Failed: " + e.message); }
+  }
+
+  async function handleApplyLabel(labelId) {
+    if (!selectedThreadId) return;
+    try {
+      await modifyThread(uid, selectedThreadId, [labelId], []);
+      setShowLabelPicker(false);
+    } catch (e) { alert("Failed to apply label: " + e.message); }
+  }
+
+  async function handleSnooze(hours, label) {
+    if (!selectedThreadId) return;
+    const remindAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    const firstMsg = messages.find(m => m.threadId === selectedThreadId);
+    try {
+      // Archive the thread (remove from inbox)
+      await archiveThread(uid, selectedThreadId);
+      // Save reminder in Firestore
+      const docRef = await addDoc(collection(db, "emailReminders"), {
+        userId: uid,
+        threadId: selectedThreadId,
+        messageId: selectedId,
+        subject: firstMsg?.subject || "(no subject)",
+        from: firstMsg?.from || "",
+        remindAt,
+        label,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+      setSnoozeReminders(prev => ({
+        ...prev,
+        [selectedThreadId]: { remindAt, label, subject: firstMsg?.subject, docId: docRef.id },
+      }));
+      // Remove from list
+      setMessages(prev => prev.filter(m => m.threadId !== selectedThreadId));
+      setSelectedId(null);
+      setSelectedThreadId(null);
+      setThreadMessages([]);
+      setShowSnoozeMenu(false);
+    } catch (e) { alert("Failed to snooze: " + e.message); }
+  }
+
   if (connected === null) {
     return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-faint)", fontSize: 13 }}>Loading...</div>;
   }
@@ -363,8 +496,10 @@ export default function InboxPage({ currentUser }) {
 
   const tabs = [
     { id: "inbox", label: "Inbox" },
+    { id: "starred", label: "Starred" },
     { id: "sent", label: "Sent" },
     { id: "drafts", label: "Drafts" },
+    { id: "trash", label: "Trash" },
   ];
 
   return (
@@ -540,49 +675,192 @@ export default function InboxPage({ currentUser }) {
           const threadSubject = threadMessages[0]?.subject || "(no subject)";
           return (
             <>
-              {/* Thread header */}
-              <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                  <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", margin: 0, flex: 1 }}>
+              {/* Thread header + action toolbar */}
+              <div style={{ borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                {/* Action toolbar */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "10px 24px",
+                  borderBottom: "1px solid var(--border)", background: "var(--surface)",
+                }}>
+                  {(() => {
+                    const btnStyle = {
+                      background: "transparent", border: "1px solid var(--border)", borderRadius: 6,
+                      padding: "5px 10px", fontSize: 11, cursor: "pointer", display: "flex",
+                      alignItems: "center", gap: 4, fontFamily: "'DM Sans',sans-serif",
+                      color: "var(--text-secondary)", fontWeight: 500, whiteSpace: "nowrap",
+                    };
+                    const isStarred = messages.find(m => m.threadId === selectedThreadId)?.labelIds?.includes("STARRED");
+                    const isUnread = messages.find(m => m.threadId === selectedThreadId)?.isUnread;
+                    return (
+                      <>
+                        {/* Archive */}
+                        <button onClick={handleArchive} style={btnStyle} title="Archive">
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <rect x="1" y="1" width="11" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                            <path d="M2 5v6.5a1 1 0 001 1h7a1 1 0 001-1V5" stroke="currentColor" strokeWidth="1.2"/>
+                            <path d="M5 8h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                          </svg>
+                          Archive
+                        </button>
+
+                        {/* Delete */}
+                        <button onClick={handleTrash} style={{ ...btnStyle, color: "#f87171" }} title="Delete">
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <path d="M2 3.5h9M4.5 3.5V2.5a1 1 0 011-1h2a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h3a1 1 0 001-1l.5-8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                          </svg>
+                          Delete
+                        </button>
+
+                        {/* Star */}
+                        <button onClick={handleToggleStar} style={{ ...btnStyle, color: isStarred ? "#fbbf24" : "var(--text-secondary)" }} title={isStarred ? "Unstar" : "Star"}>
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill={isStarred ? "#fbbf24" : "none"}>
+                            <path d="M6.5 1l1.6 3.3 3.6.5-2.6 2.5.6 3.6L6.5 9.2 3.3 10.9l.6-3.6L1.3 4.8l3.6-.5z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>
+                          </svg>
+                          {isStarred ? "Starred" : "Star"}
+                        </button>
+
+                        {/* Mark read/unread */}
+                        <button onClick={handleToggleRead} style={btnStyle} title={isUnread ? "Mark as read" : "Mark as unread"}>
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <rect x="1" y="3" width="11" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                            {isUnread ? (
+                              <path d="M1 4.5l5.5 3.5 5.5-3.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                            ) : (
+                              <circle cx="9.5" cy="4" r="2" fill="#6366f1" stroke="var(--surface)" strokeWidth="0.5"/>
+                            )}
+                          </svg>
+                          {isUnread ? "Mark read" : "Mark unread"}
+                        </button>
+
+                        {/* Snooze / Remind */}
+                        <div style={{ position: "relative" }}>
+                          <button onClick={() => { setShowSnoozeMenu(p => !p); setShowLabelPicker(false); }} style={btnStyle} title="Snooze">
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                              <circle cx="6.5" cy="7" r="5" stroke="currentColor" strokeWidth="1.2"/>
+                              <path d="M6.5 4.5v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            Snooze
+                          </button>
+                          {showSnoozeMenu && (
+                            <div style={{
+                              position: "absolute", top: "100%", left: 0, zIndex: 100, marginTop: 4,
+                              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10,
+                              width: 200, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", overflow: "hidden",
+                            }}>
+                              <div style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border)" }}>
+                                Snooze until...
+                              </div>
+                              {[
+                                { label: "Later today", hours: 3, tag: "later_today" },
+                                { label: "Tomorrow morning", hours: 18, tag: "tomorrow" },
+                                { label: "This weekend", hours: (() => { const d = new Date(); const sat = 6 - d.getDay(); return sat <= 0 ? (sat + 7) * 24 : sat * 24; })(), tag: "weekend" },
+                                { label: "Next week", hours: (() => { const d = new Date(); const mon = (8 - d.getDay()) % 7 || 7; return mon * 24; })(), tag: "next_week" },
+                              ].map(opt => (
+                                <button
+                                  key={opt.tag}
+                                  onClick={() => handleSnooze(opt.hours, opt.tag)}
+                                  style={{
+                                    width: "100%", textAlign: "left", background: "transparent", border: "none",
+                                    padding: "8px 12px", fontSize: 12, color: "var(--text)", cursor: "pointer",
+                                    fontFamily: "'DM Sans',sans-serif",
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.08)"}
+                                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Labels */}
+                        <div style={{ position: "relative" }}>
+                          <button onClick={() => { setShowLabelPicker(p => !p); setShowSnoozeMenu(false); }} style={btnStyle} title="Label">
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                              <path d="M1.5 3a1 1 0 011-1h3.6a1 1 0 01.7.3l5.2 5.2a1 1 0 010 1.4l-3.1 3.1a1 1 0 01-1.4 0L2.3 6.8a1 1 0 01-.3-.7V3.5z" stroke="currentColor" strokeWidth="1.2"/>
+                              <circle cx="4.5" cy="4.5" r="0.8" fill="currentColor"/>
+                            </svg>
+                            Label
+                          </button>
+                          {showLabelPicker && (
+                            <div style={{
+                              position: "absolute", top: "100%", left: 0, zIndex: 100, marginTop: 4,
+                              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10,
+                              width: 220, maxHeight: 250, overflow: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                            }}>
+                              <div style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border)" }}>
+                                Apply label
+                              </div>
+                              {gmailLabels.length === 0 && (
+                                <div style={{ padding: 12, fontSize: 12, color: "var(--text-faint)" }}>No labels found</div>
+                              )}
+                              {gmailLabels.map(label => (
+                                <button
+                                  key={label.id}
+                                  onClick={() => handleApplyLabel(label.id)}
+                                  style={{
+                                    width: "100%", textAlign: "left", background: "transparent", border: "none",
+                                    padding: "7px 12px", fontSize: 12, color: "var(--text)", cursor: "pointer",
+                                    fontFamily: "'DM Sans',sans-serif", borderBottom: "1px solid var(--border)",
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = "rgba(99,102,241,0.08)"}
+                                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                                >
+                                  {label.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1 }} />
+
+                        {/* Deal tag */}
+                        <div style={{ position: "relative" }}>
+                          {dealTags[selectedId] ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 600, background: "rgba(99,102,241,0.15)",
+                                color: "#a5b4fc", borderRadius: 4, padding: "4px 8px",
+                              }}>
+                                {dealTags[selectedId].dealName}
+                              </span>
+                              <button onClick={() => handleUntagDeal(selectedId)} style={{
+                                background: "none", border: "none", color: "var(--text-faint)",
+                                cursor: "pointer", fontSize: 14, padding: 0,
+                              }}>&times;</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setShowDealPicker(p => !p); setShowLabelPicker(false); setShowSnoozeMenu(false); }} style={{ ...btnStyle, color: "#6366f1", fontWeight: 600 }}>
+                              Tag Deal
+                            </button>
+                          )}
+                          {showDealPicker && (
+                            <DealTagPicker
+                              onSelect={handleTagDeal}
+                              onClose={() => setShowDealPicker(false)}
+                            />
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Subject + thread count */}
+                <div style={{ padding: "12px 24px" }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", margin: 0 }}>
                     {threadSubject}
                   </h3>
-                  {/* Deal tag */}
-                  <div style={{ position: "relative", flexShrink: 0 }}>
-                    {dealTags[selectedId] ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{
-                          fontSize: 10, fontWeight: 600, background: "rgba(99,102,241,0.15)",
-                          color: "#a5b4fc", borderRadius: 4, padding: "4px 8px",
-                        }}>
-                          {dealTags[selectedId].dealName}
-                        </span>
-                        <button onClick={() => handleUntagDeal(selectedId)} style={{
-                          background: "none", border: "none", color: "var(--text-faint)",
-                          cursor: "pointer", fontSize: 14, padding: 0,
-                        }}>&times;</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowDealPicker(p => !p)}
-                        style={{
-                          background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6,
-                          padding: "6px 12px", fontSize: 11, color: "#6366f1", cursor: "pointer",
-                          fontFamily: "'DM Sans',sans-serif", fontWeight: 600,
-                        }}
-                      >
-                        Tag Deal
-                      </button>
-                    )}
-                    {showDealPicker && (
-                      <DealTagPicker
-                        onSelect={handleTagDeal}
-                        onClose={() => setShowDealPicker(false)}
-                      />
+                  <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>
+                    {threadMessages.length} message{threadMessages.length !== 1 ? "s" : ""} in this thread
+                    {snoozeReminders[selectedThreadId] && (
+                      <span style={{ marginLeft: 8, color: "#f59e0b", fontWeight: 600 }}>
+                        Snoozed until {new Date(snoozeReminders[selectedThreadId].remindAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                      </span>
                     )}
                   </div>
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
-                  {threadMessages.length} message{threadMessages.length !== 1 ? "s" : ""} in this thread
                 </div>
               </div>
 

@@ -246,6 +246,52 @@ export default async function handler(req, res) {
         return res.json(await r.json());
       }
 
+      case "trash": {
+        const { id: trashId } = req.body;
+        if (!trashId) return res.status(400).json({ error: "Missing id" });
+        const r = await fetch(`${base}/messages/${trashId}/trash`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) throw new Error(`Gmail trash error (${r.status})`);
+        return res.json(await r.json());
+      }
+
+      case "untrash": {
+        const { id: untrashId } = req.body;
+        if (!untrashId) return res.status(400).json({ error: "Missing id" });
+        const r = await fetch(`${base}/messages/${untrashId}/untrash`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) throw new Error(`Gmail untrash error (${r.status})`);
+        return res.json(await r.json());
+      }
+
+      case "thread_modify": {
+        // Modify all messages in a thread (archive, star, mark read/unread)
+        const { threadId: tmThreadId, addLabelIds: tmAdd, removeLabelIds: tmRemove } = req.body;
+        if (!tmThreadId) return res.status(400).json({ error: "Missing threadId" });
+        const r = await fetch(`${base}/threads/${tmThreadId}/modify`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ addLabelIds: tmAdd, removeLabelIds: tmRemove }),
+        });
+        if (!r.ok) throw new Error(`Gmail thread modify error (${r.status})`);
+        return res.json(await r.json());
+      }
+
+      case "thread_trash": {
+        const { threadId: ttThreadId } = req.body;
+        if (!ttThreadId) return res.status(400).json({ error: "Missing threadId" });
+        const r = await fetch(`${base}/threads/${ttThreadId}/trash`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) throw new Error(`Gmail thread trash error (${r.status})`);
+        return res.json(await r.json());
+      }
+
       case "schedule": {
         // Gmail doesn't have native schedule API - we send with a delay header
         // For now, create as draft and return the draft ID

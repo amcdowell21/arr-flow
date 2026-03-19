@@ -169,4 +169,52 @@ export async function modifyMessage(uid, messageId, addLabelIds = [], removeLabe
   return gmailPost(uid, "modify", { id: messageId, addLabelIds, removeLabelIds });
 }
 
+export async function trashMessage(uid, messageId) {
+  return gmailPost(uid, "trash", { id: messageId });
+}
+
+export async function untrashMessage(uid, messageId) {
+  return gmailPost(uid, "untrash", { id: messageId });
+}
+
+export async function trashThread(uid, threadId) {
+  return gmailPost(uid, "thread_trash", { threadId });
+}
+
+export async function modifyThread(uid, threadId, addLabelIds = [], removeLabelIds = []) {
+  return gmailPost(uid, "thread_modify", { threadId, addLabelIds, removeLabelIds });
+}
+
+export async function archiveThread(uid, threadId) {
+  return modifyThread(uid, threadId, [], ["INBOX"]);
+}
+
+export async function starThread(uid, threadId) {
+  return modifyThread(uid, threadId, ["STARRED"], []);
+}
+
+export async function unstarThread(uid, threadId) {
+  return modifyThread(uid, threadId, [], ["STARRED"]);
+}
+
+export async function markThreadRead(uid, threadId) {
+  return modifyThread(uid, threadId, [], ["UNREAD"]);
+}
+
+export async function markThreadUnread(uid, threadId) {
+  return modifyThread(uid, threadId, ["UNREAD"], []);
+}
+
+export async function listLabels(uid) {
+  return gmailGet(uid, "labels");
+}
+
+export async function addLabel(uid, messageId, labelId) {
+  return modifyMessage(uid, messageId, [labelId], []);
+}
+
+export async function removeLabel(uid, messageId, labelId) {
+  return modifyMessage(uid, messageId, [], [labelId]);
+}
+
 export { getHeader, getMessageBody, encodeMessage };
