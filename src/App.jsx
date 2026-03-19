@@ -14,6 +14,8 @@ import AdminPanel from "./AdminPanel";
 import TodosPage from "./TodosPage";
 import BobPage from "./BobPage";
 import BobFloat from "./BobFloat";
+import InboxPage from "./InboxPage";
+import CalendarPage from "./CalendarPage";
 
 const ADMIN_EMAIL = "admin@uniqlearn.co";
 
@@ -314,6 +316,31 @@ function AppSidebar({ view, onNavigate, scenarios, loading, onLoad, onDelete, on
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <rect x="1.5" y="1.5" width="11" height="11" rx="2" stroke={active ? "#fcd34d" : "var(--text-muted)"} strokeWidth="1.3"/>
           <path d="M4 5h6M4 7.5h4M4 10h5" stroke={active ? "#fcd34d" : "var(--text-muted)"} strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+      ),
+    },
+    {
+      id: "inbox",
+      label: "Inbox",
+      color: "#ec4899",
+      icon: (active) => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1.5" y="3" width="11" height="8" rx="1.5" stroke={active ? "#f9a8d4" : "var(--text-muted)"} strokeWidth="1.3"/>
+          <path d="M1.5 4.5l5.5 3.5 5.5-3.5" stroke={active ? "#f9a8d4" : "var(--text-muted)"} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      ),
+    },
+    {
+      id: "calendar",
+      label: "Calendar",
+      color: "#14b8a6",
+      icon: (active) => (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1.5" y="2.5" width="11" height="10" rx="1.5" stroke={active ? "#5eead4" : "var(--text-muted)"} strokeWidth="1.3"/>
+          <line x1="1.5" y1="5.5" x2="12.5" y2="5.5" stroke={active ? "#5eead4" : "var(--text-muted)"} strokeWidth="1.1"/>
+          <circle cx="5" cy="8.5" r="0.8" fill={active ? "#5eead4" : "var(--text-muted)"}/>
+          <circle cx="7" cy="8.5" r="0.8" fill={active ? "#5eead4" : "var(--text-muted)"}/>
+          <circle cx="9" cy="8.5" r="0.8" fill={active ? "#5eead4" : "var(--text-muted)"}/>
         </svg>
       ),
     },
@@ -690,6 +717,33 @@ function HomePage({ onNavigate, currentUser }) {
         </svg>
       ),
     },
+    {
+      id: "inbox",
+      title: "Inbox",
+      desc: "Read, compose, and manage emails. Tag emails to deals for context.",
+      color: "#ec4899",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect x="3" y="7" width="26" height="18" rx="3" stroke="#ec4899" strokeWidth="2.2" fill="none"/>
+          <path d="M3 10l13 9 13-9" stroke="#ec4899" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      ),
+    },
+    {
+      id: "calendar",
+      title: "Calendar",
+      desc: "View, create, and manage calendar events. Link meetings to pipeline deals.",
+      color: "#14b8a6",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect x="4" y="6" width="24" height="22" rx="3" stroke="#14b8a6" strokeWidth="2.2" fill="none"/>
+          <line x1="4" y1="13" x2="28" y2="13" stroke="#14b8a6" strokeWidth="2"/>
+          <circle cx="11" cy="20" r="2" fill="#14b8a6"/>
+          <circle cx="16" cy="20" r="2" fill="#14b8a6" opacity="0.7"/>
+          <circle cx="21" cy="20" r="2" fill="#14b8a6" opacity="0.4"/>
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -818,15 +872,15 @@ function HomePage({ onNavigate, currentUser }) {
         </div>
       </button>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 250px)", gap: 20, justifyContent: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 230px)", gap: 16, justifyContent: "center" }}>
         {tiles.map(tile => (
           <button
             key={tile.id}
             onClick={() => onNavigate(tile.id)}
             style={{
-              width: 250, textAlign: "left", background: "var(--surface)",
+              width: "100%", textAlign: "left", background: "var(--surface)",
               border: "1px solid var(--border)",
-              borderRadius: 16, padding: "28px 24px", cursor: "pointer", transition: "all 0.18s",
+              borderRadius: 16, padding: "24px 20px", cursor: "pointer", transition: "all 0.18s",
               position: "relative", overflow: "hidden",
             }}
             onMouseEnter={e => {
@@ -2050,6 +2104,10 @@ export default function ARRFlow() {
 
       {/* Bob AI agent */}
       {view === "bob" && <BobPage currentUser={currentUser} hsToken={hsToken} />}
+
+      {view === "inbox" && <InboxPage currentUser={currentUser} />}
+
+      {view === "calendar" && <CalendarPage currentUser={currentUser} />}
 
       {/* Input Metrics (main) content */}
       <div ref={pageRef} style={{ flex:1, padding:"32px 20px 80px", display: (view !== "main") ? "none" : "flex", flexDirection:"column", alignItems:"center", minWidth:0 }}>

@@ -87,6 +87,24 @@ service cloud.firestore {
       allow read, write: if isActiveUser();
     }
 
+    match /userGoogleTokens/{uid} {
+      allow read: if isActiveUser() && request.auth.uid == uid;
+      allow write: if false; // Server-side only (Admin SDK)
+    }
+
+    match /dealEmails/{id} {
+      allow read, write: if isActiveUser();
+    }
+
+    match /dealCalendarEvents/{id} {
+      allow read, write: if isActiveUser();
+    }
+
+    match /scheduledEmails/{id} {
+      allow read: if isActiveUser() && resource.data.userId == request.auth.uid;
+      allow create: if isActiveUser() && request.resource.data.userId == request.auth.uid;
+    }
+
     match /bobConversations/{convId} {
       allow read: if isActiveUser()
         && resource.data.userId == request.auth.uid;

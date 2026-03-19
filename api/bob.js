@@ -216,7 +216,174 @@ const TOOLS = [
       required: ["hubspotDealId", "stageId"],
     },
   },
+  // ─── Gmail & Calendar tools ──────────────────────────────────────────────
+  {
+    name: "search_emails",
+    description: "Search Gmail inbox by query (supports Gmail search syntax like 'from:name subject:topic'). Returns a list of matching emails with sender, subject, date, and snippet.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Gmail search query (e.g. 'from:john subject:proposal')" },
+        maxResults: { type: "number", description: "Max results to return (default 10)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "read_email",
+    description: "Read a specific email by its Gmail message ID. Returns full body, sender, recipients, subject, and date.",
+    input_schema: {
+      type: "object",
+      properties: { messageId: { type: "string", description: "Gmail message ID" } },
+      required: ["messageId"],
+    },
+  },
+  {
+    name: "send_email",
+    description: "Send an email. The body should be plain text or simple HTML.",
+    input_schema: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Recipient email address" },
+        subject: { type: "string" },
+        body: { type: "string", description: "Email body (plain text or HTML)" },
+        cc: { type: "string", description: "CC recipients (comma-separated)" },
+        threadId: { type: "string", description: "Thread ID to reply to" },
+        inReplyTo: { type: "string", description: "Message-ID header for threading" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
+  {
+    name: "draft_email",
+    description: "Create a draft email without sending it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        to: { type: "string" },
+        subject: { type: "string" },
+        body: { type: "string" },
+        cc: { type: "string" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
+  {
+    name: "list_calendar_events",
+    description: "List upcoming Google Calendar events within a date range.",
+    input_schema: {
+      type: "object",
+      properties: {
+        timeMin: { type: "string", description: "Start datetime ISO string (e.g. 2026-03-18T00:00:00Z)" },
+        timeMax: { type: "string", description: "End datetime ISO string" },
+        maxResults: { type: "number", description: "Max events (default 20)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_calendar_event",
+    description: "Create a new Google Calendar event.",
+    input_schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string", description: "Event title" },
+        date: { type: "string", description: "Date YYYY-MM-DD" },
+        startTime: { type: "string", description: "Start time HH:MM (24h)" },
+        endTime: { type: "string", description: "End time HH:MM (24h)" },
+        description: { type: "string" },
+        location: { type: "string" },
+        attendees: { type: "array", items: { type: "string" }, description: "Array of attendee email addresses" },
+        allDay: { type: "boolean", description: "If true, create an all-day event" },
+      },
+      required: ["summary", "date"],
+    },
+  },
+  {
+    name: "update_calendar_event",
+    description: "Update an existing Google Calendar event.",
+    input_schema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string" },
+        summary: { type: "string" },
+        date: { type: "string" },
+        startTime: { type: "string" },
+        endTime: { type: "string" },
+        description: { type: "string" },
+        location: { type: "string" },
+      },
+      required: ["eventId"],
+    },
+  },
+  {
+    name: "tag_deal_email",
+    description: "Associate a Gmail email with a pipeline deal for tracking.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dealId: { type: "string", description: "Firestore pipelineDeals doc ID" },
+        messageId: { type: "string", description: "Gmail message ID" },
+      },
+      required: ["dealId", "messageId"],
+    },
+  },
+  {
+    name: "tag_deal_calendar_event",
+    description: "Associate a calendar event with a pipeline deal.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dealId: { type: "string", description: "Firestore pipelineDeals doc ID" },
+        eventId: { type: "string", description: "Google Calendar event ID" },
+      },
+      required: ["dealId", "eventId"],
+    },
+  },
+  {
+    name: "get_deal_activity",
+    description: "Get all emails and calendar events linked to a specific deal.",
+    input_schema: {
+      type: "object",
+      properties: { dealId: { type: "string" } },
+      required: ["dealId"],
+    },
+  },
 ];
+
+// ─── Google token helper ─────────────────────────────────────────────────────
+async function getGoogleAccessToken(userId) {
+  const db = getDb();
+  const snap = await db.collection("userGoogleTokens").doc(userId).get();
+  if (!snap.exists) return null;
+  const data = snap.data();
+  if (Date.now() < data.expiresAt - 60000) return data.accessToken;
+  // Refresh
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: data.refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) return null;
+  const tokens = await res.json();
+  const update = { accessToken: tokens.access_token, expiresAt: Date.now() + tokens.expires_in * 1000 };
+  if (tokens.refresh_token) update.refreshToken = tokens.refresh_token;
+  await db.collection("userGoogleTokens").doc(userId).update(update);
+  return tokens.access_token;
+}
+
+function encodeRawEmail({ to, subject, body, cc, inReplyTo }) {
+  const lines = [`To: ${to}`, `Subject: ${subject}`, "Content-Type: text/html; charset=utf-8", "MIME-Version: 1.0"];
+  if (cc) lines.splice(1, 0, `Cc: ${cc}`);
+  if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`, `References: ${inReplyTo}`);
+  lines.push("", body);
+  return Buffer.from(lines.join("\r\n")).toString("base64url");
+}
 
 // ─── Tool execution ─────────────────────────────────────────────────────────
 async function executeTool(name, input, ctx) {
@@ -503,6 +670,202 @@ async function executeTool(name, input, ctx) {
       return { success: true, dealId: input.hubspotDealId, newStage: input.stageId };
     }
 
+    // ─── Gmail tools ──────────────────────────────────────────────────────
+    case "search_emails": {
+      const gToken = await getGoogleAccessToken(userId);
+      if (!gToken) return { error: "Google not connected. Ask the user to connect their Google account in the app." };
+      const maxR = input.maxResults || 10;
+      const params = new URLSearchParams({ q: input.query, maxResults: String(maxR) });
+      const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, {
+        headers: { Authorization: `Bearer ${gToken}` },
+      });
+      if (!listRes.ok) return { error: `Gmail search error (${listRes.status})` };
+      const listData = await listRes.json();
+      const ids = (listData.messages || []).map(m => m.id);
+      if (ids.length === 0) return { emails: [], message: "No emails found" };
+      // Fetch metadata for each
+      const emails = [];
+      for (const id of ids.slice(0, maxR)) {
+        const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata`, {
+          headers: { Authorization: `Bearer ${gToken}` },
+        });
+        if (r.ok) {
+          const msg = await r.json();
+          const getH = (name) => (msg.payload?.headers || []).find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+          emails.push({ id: msg.id, threadId: msg.threadId, from: getH("From"), to: getH("To"), subject: getH("Subject"), date: getH("Date"), snippet: msg.snippet });
+        }
+      }
+      return { emails };
+    }
+
+    case "read_email": {
+      const gToken = await getGoogleAccessToken(userId);
+      if (!gToken) return { error: "Google not connected" };
+      const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${input.messageId}?format=full`, {
+        headers: { Authorization: `Bearer ${gToken}` },
+      });
+      if (!r.ok) return { error: `Gmail read error (${r.status})` };
+      const msg = await r.json();
+      const getH = (name) => (msg.payload?.headers || []).find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+      // Extract body
+      function findBody(payload) {
+        if (payload.body?.data) return Buffer.from(payload.body.data, "base64url").toString("utf-8");
+        for (const part of (payload.parts || [])) {
+          if (part.mimeType === "text/plain" && part.body?.data) return Buffer.from(part.body.data, "base64url").toString("utf-8");
+          if (part.parts) { const b = findBody(part); if (b) return b; }
+        }
+        return "";
+      }
+      const body = findBody(msg.payload).slice(0, 3000); // Truncate for context window
+      return { id: msg.id, threadId: msg.threadId, from: getH("From"), to: getH("To"), cc: getH("Cc"), subject: getH("Subject"), date: getH("Date"), messageIdHeader: getH("Message-ID"), body };
+    }
+
+    case "send_email": {
+      const gToken = await getGoogleAccessToken(userId);
+      if (!gToken) return { error: "Google not connected" };
+      const raw = encodeRawEmail({ to: input.to, subject: input.subject, body: input.body, cc: input.cc, inReplyTo: input.inReplyTo });
+      const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${gToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ raw }),
+      });
+      if (!r.ok) return { error: `Gmail send error (${r.status})` };
+      const sent = await r.json();
+      return { success: true, messageId: sent.id };
+    }
+
+    case "draft_email": {
+      const gToken = await getGoogleAccessToken(userId);
+      if (!gToken) return { error: "Google not connected" };
+      const raw = encodeRawEmail({ to: input.to, subject: input.subject, body: input.body, cc: input.cc });
+      const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${gToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: { raw } }),
+      });
+      if (!r.ok) return { error: `Gmail draft error (${r.status})` };
+      const draft = await r.json();
+      return { success: true, draftId: draft.id };
+    }
+
+    // ─── Calendar tools ────────────────────────────────────────────────────
+    case "list_calendar_events": {
+      const gToken = await getGoogleAccessToken(userId);
+      if (!gToken) return { error: "Google not connected" };
+      const params = new URLSearchParams({ singleEvents: "true", orderBy: "startTime", maxResults: String(input.maxResults || 20) });
+      if (input.timeMin) params.set("timeMin", input.timeMin);
+      else params.set("timeMin", new Date().toISOString());
+      if (input.timeMax) params.set("timeMax", input.timeMax);
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+        headers: { Authorization: `Bearer ${gToken}` },
+      });
+      if (!r.ok) return { error: `Calendar list error (${r.status})` };
+      const data = await r.json();
+      return { events: (data.items || []).map(e => ({ id: e.id, summary: e.summary, start: e.start?.dateTime || e.start?.date, end: e.end?.dateTime || e.end?.date, location: e.location, attendees: (e.attendees || []).map(a => a.email) })) };
+    }
+
+    case "create_calendar_event": {
+      const gToken = await getGoogleAccessToken(userId);
+      if (!gToken) return { error: "Google not connected" };
+      const tz = ctx.tz || "America/Chicago";
+      const body = { summary: input.summary, description: input.description, location: input.location };
+      if (input.allDay) {
+        body.start = { date: input.date };
+        body.end = { date: input.date };
+      } else {
+        body.start = { dateTime: `${input.date}T${input.startTime || "09:00"}:00`, timeZone: tz };
+        body.end = { dateTime: `${input.date}T${input.endTime || "10:00"}:00`, timeZone: tz };
+      }
+      if (input.attendees?.length) body.attendees = input.attendees.map(e => ({ email: e }));
+      const r = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${gToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) return { error: `Calendar create error (${r.status})` };
+      const evt = await r.json();
+      return { success: true, eventId: evt.id, summary: evt.summary, start: evt.start };
+    }
+
+    case "update_calendar_event": {
+      const gToken = await getGoogleAccessToken(userId);
+      if (!gToken) return { error: "Google not connected" };
+      const tz = ctx.tz || "America/Chicago";
+      const body = {};
+      if (input.summary) body.summary = input.summary;
+      if (input.description) body.description = input.description;
+      if (input.location) body.location = input.location;
+      if (input.date && input.startTime) body.start = { dateTime: `${input.date}T${input.startTime}:00`, timeZone: tz };
+      if (input.date && input.endTime) body.end = { dateTime: `${input.date}T${input.endTime}:00`, timeZone: tz };
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${input.eventId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${gToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) return { error: `Calendar update error (${r.status})` };
+      return { success: true, eventId: input.eventId };
+    }
+
+    // ─── Deal tagging tools ────────────────────────────────────────────────
+    case "tag_deal_email": {
+      const dealSnap = await db.collection("pipelineDeals").doc(input.dealId).get();
+      if (!dealSnap.exists) return { error: "Deal not found" };
+      // Get email metadata
+      const gToken = await getGoogleAccessToken(userId);
+      let emailMeta = {};
+      if (gToken) {
+        try {
+          const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${input.messageId}?format=metadata`, {
+            headers: { Authorization: `Bearer ${gToken}` },
+          });
+          if (r.ok) {
+            const msg = await r.json();
+            const getH = (n) => (msg.payload?.headers || []).find(h => h.name.toLowerCase() === n.toLowerCase())?.value || "";
+            emailMeta = { threadId: msg.threadId, subject: getH("Subject"), from: getH("From"), date: getH("Date") };
+          }
+        } catch {}
+      }
+      await db.collection("dealEmails").add({
+        dealId: input.dealId, dealName: dealSnap.data().name,
+        gmailMessageId: input.messageId, ...emailMeta,
+        taggedBy: userId, taggedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { success: true, dealName: dealSnap.data().name };
+    }
+
+    case "tag_deal_calendar_event": {
+      const dealSnap = await db.collection("pipelineDeals").doc(input.dealId).get();
+      if (!dealSnap.exists) return { error: "Deal not found" };
+      const gToken = await getGoogleAccessToken(userId);
+      let evtMeta = {};
+      if (gToken) {
+        try {
+          const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${input.eventId}`, {
+            headers: { Authorization: `Bearer ${gToken}` },
+          });
+          if (r.ok) {
+            const evt = await r.json();
+            evtMeta = { title: evt.summary, startTime: evt.start?.dateTime || evt.start?.date, endTime: evt.end?.dateTime || evt.end?.date };
+          }
+        } catch {}
+      }
+      await db.collection("dealCalendarEvents").add({
+        dealId: input.dealId, dealName: dealSnap.data().name,
+        calendarEventId: input.eventId, calendarId: "primary", ...evtMeta,
+        taggedBy: userId, taggedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { success: true, dealName: dealSnap.data().name };
+    }
+
+    case "get_deal_activity": {
+      const emailSnap = await db.collection("dealEmails").where("dealId", "==", input.dealId).get();
+      const calSnap = await db.collection("dealCalendarEvents").where("dealId", "==", input.dealId).get();
+      return {
+        emails: emailSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        calendarEvents: calSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      };
+    }
+
     default:
       return { error: `Unknown tool: ${name}` };
   }
@@ -598,6 +961,13 @@ Data model context:
 - You can move HubSpot deals between pipeline stages (columns) using move_hubspot_deal. Always call list_hubspot_stages first to get valid stage IDs, then search_hubspot_deals to find the deal.
 - Follow-ups are date-based reminders linked to deals
 - Notes use a block editor with types: text, h1, h2, h3, bullet, numbered, todo, quote, code, divider
+
+Gmail & Calendar capabilities:
+- You can search, read, send, and draft emails via the user's connected Google account
+- You can list, create, and update Google Calendar events
+- You can tag emails and calendar events to pipeline deals for tracking (tag_deal_email, tag_deal_calendar_event)
+- Use get_deal_activity to see all emails and events linked to a specific deal
+- If the user hasn't connected Google yet, tell them to visit the Inbox or Calendar page to connect
 
 CRITICAL DATE RULES — violating these is unacceptable:
 1. Dates in tool results are pre-annotated with their correct day-of-week (e.g. "Thursday 2026-03-19"). ALWAYS use the day-of-week exactly as it appears in the data. NEVER recompute or guess the day.
