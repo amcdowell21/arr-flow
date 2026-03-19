@@ -102,6 +102,13 @@ export async function listMessages(uid, q = "", maxResults = 20, pageToken = "")
   return gmailGet(uid, "list", params);
 }
 
+export async function listMessagesWithMetadata(uid, q = "", maxResults = 20, pageToken = "") {
+  const params = { maxResults: String(maxResults) };
+  if (q) params.q = q;
+  if (pageToken) params.pageToken = pageToken;
+  return gmailGet(uid, "list_with_metadata", params);
+}
+
 export async function getMessage(uid, messageId) {
   const msg = await gmailGet(uid, "get", { id: messageId });
   return {

@@ -68,6 +68,49 @@ export default async function handler(req, res) {
         return res.json(await r.json());
       }
 
+      case "list_with_metadata": {
+        // Single call that lists messages AND fetches metadata for each — avoids N round trips from client
+        const q = req.query.q || "";
+        const maxResults = req.query.maxResults || "20";
+        const pageToken = req.query.pageToken || "";
+        const params = new URLSearchParams({ maxResults });
+        if (q) params.set("q", q);
+        if (pageToken) params.set("pageToken", pageToken);
+        const listR = await fetch(`${base}/messages?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!listR.ok) throw new Error(`Gmail list error (${listR.status})`);
+        const listData = await listR.json();
+        const ids = (listData.messages || []).map(m => m.id);
+
+        // Fetch metadata in parallel server-side (fast, no extra network hops)
+        const getH = (headers, name) => (headers || []).find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+        const metaPromises = ids.map(async (id) => {
+          try {
+            const r = await fetch(`${base}/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!r.ok) return null;
+            const msg = await r.json();
+            return {
+              id: msg.id,
+              threadId: msg.threadId,
+              from: getH(msg.payload?.headers, "From"),
+              to: getH(msg.payload?.headers, "To"),
+              subject: getH(msg.payload?.headers, "Subject"),
+              date: getH(msg.payload?.headers, "Date"),
+              snippet: msg.snippet,
+              labelIds: msg.labelIds,
+              isUnread: (msg.labelIds || []).includes("UNREAD"),
+            };
+          } catch {
+            return null;
+          }
+        });
+        const metas = (await Promise.all(metaPromises)).filter(Boolean);
+        return res.json({ messages: metas, nextPageToken: listData.nextPageToken || null });
+      }
+
       case "get": {
         const id = req.query.id;
         if (!id) return res.status(400).json({ error: "Missing id" });

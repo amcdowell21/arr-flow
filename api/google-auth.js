@@ -8,14 +8,7 @@ export default async function handler(req, res) {
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
 
   if (!clientId || !redirectUri) {
-    return res.status(500).json({
-      error: "Google OAuth not configured",
-      debug: {
-        hasClientId: !!clientId,
-        hasRedirectUri: !!redirectUri,
-        envKeys: Object.keys(process.env).filter(k => k.startsWith("GOOGLE")),
-      },
-    });
+    return res.status(500).json({ error: "Google OAuth not configured" });
   }
 
   const scopes = [

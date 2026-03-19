@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { db } from "./firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, query, where, serverTimestamp } from "firebase/firestore";
-import { listMessages, getMessage, getMessageMetadata, sendMessage, createDraft, getProfile } from "./gmail";
+import { listMessagesWithMetadata, getMessage, sendMessage, createDraft } from "./gmail";
 
 // ─── Google Connection Banner ───────────────────────────────────────────────
 function ConnectBanner({ uid }) {
@@ -276,15 +276,11 @@ export default function InboxPage({ currentUser }) {
       else if (tab === "drafts") q = "in:drafts " + q;
       else if (!q) q = "in:inbox";
 
-      const data = await listMessages(uid, q.trim(), 25, pageToken || "");
-      const ids = (data.messages || []).map(m => m.id);
-
-      // Fetch metadata for each message
-      const metas = await Promise.all(ids.map(id => getMessageMetadata(uid, id)));
+      const data = await listMessagesWithMetadata(uid, q.trim(), 25, pageToken || "");
       if (pageToken) {
-        setMessages(prev => [...prev, ...metas]);
+        setMessages(prev => [...prev, ...(data.messages || [])]);
       } else {
-        setMessages(metas);
+        setMessages(data.messages || []);
       }
       setNextPageToken(data.nextPageToken || null);
     } catch (e) {
