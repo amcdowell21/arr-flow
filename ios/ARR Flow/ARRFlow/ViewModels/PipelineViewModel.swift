@@ -11,8 +11,13 @@ class PipelineViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var sortBy: SortOption = .value
 
+    @Published var syncStatus: String? = nil
+    @Published var isSyncing = false
+
     private var listener: ListenerRegistration?
     private let service = FirestoreService.shared
+    private let hubspotService = HubSpotService.shared
+    private var hasSynced = false
 
     enum SortOption: String, CaseIterable {
         case value = "Value"
@@ -70,6 +75,11 @@ class PipelineViewModel: ObservableObject {
         listener = service.listenToDeals { [weak self] deals in
             Task { @MainActor in
                 self?.deals = deals
+                // Auto-sync with HubSpot once on first snapshot
+                if !(self?.hasSynced ?? true) {
+                    self?.hasSynced = true
+                    await self?.syncFromHubSpot()
+                }
             }
         }
     }
@@ -88,5 +98,40 @@ class PipelineViewModel: ObservableObject {
 
     func updateDeal(_ deal: Deal) async {
         do { try await service.updateDeal(deal) } catch { print(error) }
+    }
+
+    func moveDeal(_ deal: Deal, toBucket bucket: DealBucket) async {
+        var updated = deal
+        updated.bucket = bucket
+        await updateDeal(updated)
+    }
+
+    func syncFromHubSpot() async {
+        guard APIConfig.hsToken != nil else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+
+        do {
+            let hsDeals = try await hubspotService.fetchDeals()
+            if hsDeals.isEmpty { return }
+
+            let existingHsIds = Set(deals.compactMap { $0.hubspotId })
+            let toAdd = hsDeals.filter { !existingHsIds.contains($0.id) }
+
+            if toAdd.isEmpty {
+                syncStatus = "All HubSpot deals synced"
+            } else {
+                try await service.importHubSpotDeals(toAdd)
+                syncStatus = "Imported \(toAdd.count) deal\(toAdd.count == 1 ? "" : "s") from HubSpot"
+            }
+
+            // Clear status after delay
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            syncStatus = nil
+        } catch {
+            syncStatus = "Sync error: \(error.localizedDescription)"
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            syncStatus = nil
+        }
     }
 }

@@ -32,30 +32,46 @@ class HubSpotService {
             throw NSError(domain: "HubSpot", code: 401, userInfo: [NSLocalizedDescriptionKey: "No HubSpot token configured"])
         }
 
-        let url = APIConfig.hubspotURL(path: "/crm/v3/objects/deals?limit=100&properties=dealname,amount,dealstage,pipeline,closedate,hubspot_owner_id,createdate")
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        var allDeals: [HubSpotDeal] = []
+        var after: String? = nil
 
-        let (data, _) = try await URLSession.shared.data(for: request)
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let results = json["results"] as? [[String: Any]] else {
-            return []
-        }
+        repeat {
+            var path = "/crm/v3/objects/deals?limit=100&properties=dealname,amount,dealstage,pipeline,closedate,hubspot_owner_id,createdate"
+            if let after { path += "&after=\(after)" }
 
-        return results.compactMap { deal in
-            guard let id = deal["id"] as? String,
-                  let props = deal["properties"] as? [String: Any] else { return nil }
-            return HubSpotDeal(
-                id: id,
-                name: props["dealname"] as? String ?? "Untitled",
-                amount: Double(props["amount"] as? String ?? ""),
-                stage: props["dealstage"] as? String ?? "",
-                pipeline: props["pipeline"] as? String ?? "",
-                closeDate: props["closedate"] as? String,
-                owner: props["hubspot_owner_id"] as? String,
-                createdAt: props["createdate"] as? String
-            )
-        }
+            let url = APIConfig.hubspotURL(path: path)
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            let (data, _) = try await URLSession.shared.data(for: request)
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]] else {
+                break
+            }
+
+            let pageDealsList = results.compactMap { deal -> HubSpotDeal? in
+                guard let id = deal["id"] as? String,
+                      let props = deal["properties"] as? [String: Any] else { return nil }
+                return HubSpotDeal(
+                    id: id,
+                    name: props["dealname"] as? String ?? "Untitled",
+                    amount: Double(props["amount"] as? String ?? ""),
+                    stage: props["dealstage"] as? String ?? "",
+                    pipeline: props["pipeline"] as? String ?? "",
+                    closeDate: props["closedate"] as? String,
+                    owner: props["hubspot_owner_id"] as? String,
+                    createdAt: props["createdate"] as? String
+                )
+            }
+            allDeals.append(contentsOf: pageDealsList)
+
+            // Check for next page
+            after = (json["paging"] as? [String: Any])?["next"] as? [String: Any] != nil
+                ? ((json["paging"] as? [String: Any])?["next"] as? [String: Any])?["after"] as? String
+                : nil
+        } while after != nil
+
+        return allDeals
     }
 
     func fetchPipelines() async throws -> [HubSpotPipeline] {

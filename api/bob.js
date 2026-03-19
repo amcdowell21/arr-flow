@@ -199,6 +199,23 @@ const TOOLS = [
     description: "Trigger a sync from HubSpot — imports any new deals not yet in the pipeline tracker.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
+  {
+    name: "list_hubspot_stages",
+    description: "List all HubSpot deal pipelines and their stages. Use this to find valid stage IDs before moving a deal.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "move_hubspot_deal",
+    description: "Move a HubSpot deal to a different pipeline stage (column). Use list_hubspot_stages first to get valid stage IDs, then search_hubspot_deals to find the deal ID.",
+    input_schema: {
+      type: "object",
+      properties: {
+        hubspotDealId: { type: "string", description: "HubSpot deal ID" },
+        stageId: { type: "string", description: "Target stage ID (e.g. 'appointmentscheduled', 'closedwon')" },
+      },
+      required: ["hubspotDealId", "stageId"],
+    },
+  },
 ];
 
 // ─── Tool execution ─────────────────────────────────────────────────────────
@@ -453,6 +470,39 @@ async function executeTool(name, input, ctx) {
       return { success: true, imported: count, total: allDeals.length };
     }
 
+    case "list_hubspot_stages": {
+      if (!hsToken) return { error: "No HubSpot token available" };
+      const data = await hsGet(hsToken, "/crm/v3/pipelines/deals");
+      return {
+        pipelines: (data.results ?? []).map(p => ({
+          id: p.id,
+          label: p.label,
+          stages: (p.stages ?? [])
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+            .map(s => ({ id: s.id, label: s.label, probability: s.metadata?.probability })),
+        })),
+      };
+    }
+
+    case "move_hubspot_deal": {
+      if (!hsToken) return { error: "No HubSpot token available" };
+      await hsPatch(hsToken, `/crm/v3/objects/deals/${input.hubspotDealId}`, {
+        properties: { dealstage: input.stageId },
+      });
+      // Also update the Firestore deal if it exists
+      const fsSnap = await db.collection("pipelineDeals").where("hubspotId", "==", input.hubspotDealId).get();
+      if (!fsSnap.empty) {
+        const docRef = fsSnap.docs[0].ref;
+        const updateData = {
+          hubspotStage: input.stageId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        if (input.stageId === "closedwon") updateData.closedWon = true;
+        await docRef.update(updateData);
+      }
+      return { success: true, dealId: input.hubspotDealId, newStage: input.stageId };
+    }
+
     default:
       return { error: `Unknown tool: ${name}` };
   }
@@ -545,6 +595,7 @@ Data model context:
 - Confidence is 0-100 (manual override or algorithmic)
 - expectedCloseMonth is YYYY-MM format
 - Deals can be linked to HubSpot (hubspotId field) — changes to closedWon and value auto-sync
+- You can move HubSpot deals between pipeline stages (columns) using move_hubspot_deal. Always call list_hubspot_stages first to get valid stage IDs, then search_hubspot_deals to find the deal.
 - Follow-ups are date-based reminders linked to deals
 - Notes use a block editor with types: text, h1, h2, h3, bullet, numbered, todo, quote, code, divider
 
