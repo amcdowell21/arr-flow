@@ -373,39 +373,37 @@ export default function InboxPage({ currentUser }) {
     setDealTags(prev => { const n = { ...prev }; delete n[messageId]; return n; });
   }
 
-  // ─── Thread actions ─────────────────────────────────────────────────────
-  async function handleTrash() {
-    if (!selectedThreadId) return;
+  // ─── Thread actions (accept optional threadId for hover actions) ────────
+  async function handleTrash(tid) {
+    const t = tid || selectedThreadId;
+    if (!t) return;
     try {
-      await trashThread(uid, selectedThreadId);
-      setMessages(prev => prev.filter(m => m.threadId !== selectedThreadId));
-      setSelectedId(null);
-      setSelectedThreadId(null);
-      setThreadMessages([]);
+      await trashThread(uid, t);
+      setMessages(prev => prev.filter(m => m.threadId !== t));
+      if (t === selectedThreadId) { setSelectedId(null); setSelectedThreadId(null); setThreadMessages([]); }
     } catch (e) { alert("Failed to delete: " + e.message); }
   }
 
-  async function handleArchive() {
-    if (!selectedThreadId) return;
+  async function handleArchive(tid) {
+    const t = tid || selectedThreadId;
+    if (!t) return;
     try {
-      await archiveThread(uid, selectedThreadId);
-      setMessages(prev => prev.filter(m => m.threadId !== selectedThreadId));
-      setSelectedId(null);
-      setSelectedThreadId(null);
-      setThreadMessages([]);
+      await archiveThread(uid, t);
+      setMessages(prev => prev.filter(m => m.threadId !== t));
+      if (t === selectedThreadId) { setSelectedId(null); setSelectedThreadId(null); setThreadMessages([]); }
     } catch (e) { alert("Failed to archive: " + e.message); }
   }
 
-  async function handleToggleStar() {
-    if (!selectedThreadId) return;
-    const firstMsg = messages.find(m => m.threadId === selectedThreadId);
+  async function handleToggleStar(tid) {
+    const t = tid || selectedThreadId;
+    if (!t) return;
+    const firstMsg = messages.find(m => m.threadId === t);
     const isStarred = firstMsg?.labelIds?.includes("STARRED");
     try {
-      if (isStarred) await unstarThread(uid, selectedThreadId);
-      else await starThread(uid, selectedThreadId);
-      // Update local state
+      if (isStarred) await unstarThread(uid, t);
+      else await starThread(uid, t);
       setMessages(prev => prev.map(m => {
-        if (m.threadId !== selectedThreadId) return m;
+        if (m.threadId !== t) return m;
         const ids = new Set(m.labelIds || []);
         if (isStarred) ids.delete("STARRED"); else ids.add("STARRED");
         return { ...m, labelIds: [...ids] };
@@ -413,15 +411,16 @@ export default function InboxPage({ currentUser }) {
     } catch (e) { alert("Failed to star: " + e.message); }
   }
 
-  async function handleToggleRead() {
-    if (!selectedThreadId) return;
-    const firstMsg = messages.find(m => m.threadId === selectedThreadId);
+  async function handleToggleRead(tid) {
+    const t = tid || selectedThreadId;
+    if (!t) return;
+    const firstMsg = messages.find(m => m.threadId === t);
     const isUnread = firstMsg?.isUnread;
     try {
-      if (isUnread) await markThreadRead(uid, selectedThreadId);
-      else await markThreadUnread(uid, selectedThreadId);
+      if (isUnread) await markThreadRead(uid, t);
+      else await markThreadUnread(uid, t);
       setMessages(prev => prev.map(m => {
-        if (m.threadId !== selectedThreadId) return m;
+        if (m.threadId !== t) return m;
         const ids = new Set(m.labelIds || []);
         if (isUnread) ids.delete("UNREAD"); else ids.add("UNREAD");
         return { ...m, labelIds: [...ids], isUnread: !isUnread };
@@ -584,56 +583,160 @@ export default function InboxPage({ currentUser }) {
           {messages.map(msg => {
             const isSelected = selectedId === msg.id;
             const isUnread = msg.isUnread;
+            const isStarred = msg.labelIds?.includes("STARRED");
             const tag = dealTags[msg.id];
+            const hoverBtnStyle = {
+              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 5,
+              width: 26, height: 26, cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", padding: 0, color: "var(--text-faint)", flexShrink: 0,
+              transition: "all 0.1s",
+            };
             return (
-              <button
+              <div
                 key={msg.id}
                 onClick={() => { setSelectedId(msg.id); setSelectedThreadId(msg.threadId); }}
                 style={{
-                  width: "100%", textAlign: "left", display: "flex", flexDirection: "column",
-                  padding: "12px 16px", gap: 3, border: "none", cursor: "pointer",
+                  width: "100%", textAlign: "left", display: "flex", alignItems: "center",
+                  padding: "10px 12px 10px 16px", gap: 8, border: "none", cursor: "pointer",
                   background: isSelected ? "rgba(99,102,241,0.1)" : "transparent",
                   borderLeft: isSelected ? "3px solid #6366f1" : "3px solid transparent",
                   borderBottom: "1px solid var(--border)",
-                  transition: "background 0.1s",
+                  transition: "background 0.1s", position: "relative",
                 }}
-                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(99,102,241,0.04)"; }}
-                onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
+                onMouseEnter={e => {
+                  if (!isSelected) e.currentTarget.style.background = "rgba(99,102,241,0.04)";
+                  e.currentTarget.querySelector("[data-hover-actions]").style.opacity = "1";
+                  e.currentTarget.querySelector("[data-hover-actions]").style.pointerEvents = "auto";
+                }}
+                onMouseLeave={e => {
+                  if (!isSelected) e.currentTarget.style.background = "transparent";
+                  e.currentTarget.querySelector("[data-hover-actions]").style.opacity = "0";
+                  e.currentTarget.querySelector("[data-hover-actions]").style.pointerEvents = "none";
+                }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {isUnread && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />}
+                {/* Star toggle */}
+                <button
+                  onClick={e => { e.stopPropagation(); handleToggleStar(msg.threadId); }}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: 0,
+                    flexShrink: 0, width: 16, display: "flex", alignItems: "center",
+                  }}
+                  title={isStarred ? "Unstar" : "Star"}
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill={isStarred ? "#fbbf24" : "none"}>
+                    <path d="M6.5 1l1.6 3.3 3.6.5-2.6 2.5.6 3.6L6.5 9.2 3.3 10.9l.6-3.6L1.3 4.8l3.6-.5z" stroke={isStarred ? "#fbbf24" : "#64748b"} strokeWidth="1" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {isUnread && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />}
+                    <span style={{
+                      fontSize: 12, fontWeight: isUnread ? 700 : 500, color: "var(--text)",
+                      flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {parseSender(msg.from)}
+                    </span>
+                    <span style={{ fontSize: 10, color: "var(--text-faint)", flexShrink: 0, fontFamily: "'DM Mono',monospace" }}>
+                      {formatDate(msg.date)}
+                    </span>
+                  </div>
                   <span style={{
-                    fontSize: 12, fontWeight: isUnread ? 700 : 500, color: "var(--text)",
-                    flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    fontSize: 12, fontWeight: isUnread ? 600 : 400, color: isUnread ? "var(--text)" : "var(--text-secondary)",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
-                    {parseSender(msg.from)}
+                    {msg.subject || "(no subject)"}
                   </span>
-                  <span style={{ fontSize: 10, color: "var(--text-faint)", flexShrink: 0, fontFamily: "'DM Mono',monospace" }}>
-                    {formatDate(msg.date)}
+                  <span style={{
+                    fontSize: 11, color: "var(--text-faint)", overflow: "hidden",
+                    textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {msg.snippet}
                   </span>
+                  {tag && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 600, background: "rgba(99,102,241,0.15)",
+                      color: "#a5b4fc", borderRadius: 4, padding: "2px 6px", alignSelf: "flex-start",
+                      marginTop: 2, fontFamily: "'DM Sans',sans-serif",
+                    }}>
+                      {tag.dealName}
+                    </span>
+                  )}
                 </div>
-                <span style={{
-                  fontSize: 12, fontWeight: isUnread ? 600 : 400, color: isUnread ? "var(--text)" : "var(--text-secondary)",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
-                  {msg.subject || "(no subject)"}
-                </span>
-                <span style={{
-                  fontSize: 11, color: "var(--text-faint)", overflow: "hidden",
-                  textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
-                  {msg.snippet}
-                </span>
-                {tag && (
-                  <span style={{
-                    fontSize: 9, fontWeight: 600, background: "rgba(99,102,241,0.15)",
-                    color: "#a5b4fc", borderRadius: 4, padding: "2px 6px", alignSelf: "flex-start",
-                    marginTop: 2, fontFamily: "'DM Sans',sans-serif",
-                  }}>
-                    {tag.dealName}
-                  </span>
-                )}
-              </button>
+
+                {/* Hover actions */}
+                <div
+                  data-hover-actions
+                  style={{
+                    position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                    display: "flex", gap: 3, opacity: 0, pointerEvents: "none",
+                    transition: "opacity 0.12s", background: "var(--surface)",
+                    padding: "2px 4px", borderRadius: 6, border: "1px solid var(--border)",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  {/* Archive */}
+                  <button
+                    onClick={e => { e.stopPropagation(); handleArchive(msg.threadId); }}
+                    style={hoverBtnStyle}
+                    title="Archive"
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.1)"; e.currentTarget.style.color = "#a5b4fc"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "var(--surface)"; e.currentTarget.style.color = "var(--text-faint)"; }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                      <rect x="1" y="1" width="11" height="4" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M2 5v6.5a1 1 0 001 1h7a1 1 0 001-1V5" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M5 8h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+
+                  {/* Delete */}
+                  <button
+                    onClick={e => { e.stopPropagation(); handleTrash(msg.threadId); }}
+                    style={hoverBtnStyle}
+                    title="Delete"
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(248,113,113,0.1)"; e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "var(--surface)"; e.currentTarget.style.color = "var(--text-faint)"; }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                      <path d="M2 3.5h9M4.5 3.5V2.5a1 1 0 011-1h2a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h3a1 1 0 001-1l.5-8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+
+                  {/* Mark read/unread */}
+                  <button
+                    onClick={e => { e.stopPropagation(); handleToggleRead(msg.threadId); }}
+                    style={hoverBtnStyle}
+                    title={isUnread ? "Mark as read" : "Mark as unread"}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.1)"; e.currentTarget.style.color = "#a5b4fc"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "var(--surface)"; e.currentTarget.style.color = "var(--text-faint)"; }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                      <rect x="1" y="3" width="11" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                      {isUnread ? (
+                        <path d="M1 4.5l5.5 3.5 5.5-3.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                      ) : (
+                        <circle cx="9.5" cy="4" r="2" fill="#6366f1" stroke="var(--surface)" strokeWidth="0.5"/>
+                      )}
+                    </svg>
+                  </button>
+
+                  {/* Snooze */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setSelectedId(msg.id); setSelectedThreadId(msg.threadId); setShowSnoozeMenu(true); }}
+                    style={hoverBtnStyle}
+                    title="Snooze"
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.1)"; e.currentTarget.style.color = "#a5b4fc"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "var(--surface)"; e.currentTarget.style.color = "var(--text-faint)"; }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                      <circle cx="6.5" cy="7" r="5" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M6.5 4.5v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             );
           })}
           {nextPageToken && (
@@ -918,36 +1021,67 @@ export default function InboxPage({ currentUser }) {
                   );
                 })}
 
-                {/* Reply button at bottom of thread */}
+                {/* Reply buttons at bottom of thread */}
                 <div style={{ padding: "16px 24px 24px", display: "flex", gap: 8 }}>
-                  <button
-                    onClick={() => {
-                      const fromEmail = lastMsg.from?.match(/<([^>]+)>/)?.[1] || lastMsg.from;
-                      setReplyTo({
-                        replyTo: fromEmail,
-                        subject: lastMsg.subject,
-                        messageId: lastMsg.messageId,
-                      });
-                      setComposeOpen(true);
-                    }}
-                    style={{
+                  {(() => {
+                    const replyBtnStyle = {
                       background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
                       padding: "10px 20px", fontSize: 12, color: "var(--text-secondary)", cursor: "pointer",
-                      fontFamily: "'DM Sans',sans-serif", fontWeight: 600,
-                    }}
-                  >
-                    Reply
-                  </button>
-                  <button
-                    onClick={() => { setReplyTo(null); setComposeOpen(true); }}
-                    style={{
-                      background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
-                      padding: "10px 20px", fontSize: 12, color: "var(--text-secondary)", cursor: "pointer",
-                      fontFamily: "'DM Sans',sans-serif", fontWeight: 500,
-                    }}
-                  >
-                    Forward
-                  </button>
+                      fontFamily: "'DM Sans',sans-serif", fontWeight: 500, display: "flex",
+                      alignItems: "center", gap: 6,
+                    };
+                    const fromEmail = lastMsg.from?.match(/<([^>]+)>/)?.[1] || lastMsg.from;
+                    // Collect all recipients for Reply All
+                    const allTo = [lastMsg.from, lastMsg.to, lastMsg.cc].filter(Boolean).join(", ");
+                    const allEmails = [...new Set(
+                      allTo.match(/[\w.-]+@[\w.-]+/g) || []
+                    )].filter(e => !googleEmail || !e.toLowerCase().includes(googleEmail.toLowerCase()));
+                    return (
+                      <>
+                        <button
+                          onClick={() => {
+                            setReplyTo({ replyTo: fromEmail, subject: lastMsg.subject, messageId: lastMsg.messageId });
+                            setComposeOpen(true);
+                          }}
+                          style={{ ...replyBtnStyle, fontWeight: 600 }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <path d="M5 3L1.5 6.5 5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M2 6.5h7a3 3 0 013 3v1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          </svg>
+                          Reply
+                        </button>
+                        <button
+                          onClick={() => {
+                            setReplyTo({
+                              replyTo: allEmails.join(", "),
+                              subject: lastMsg.subject,
+                              messageId: lastMsg.messageId,
+                            });
+                            setComposeOpen(true);
+                          }}
+                          style={replyBtnStyle}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <path d="M5 3L1.5 6.5 5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M7 3L3.5 6.5 7 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
+                            <path d="M4 6.5h5a3 3 0 013 3v1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          </svg>
+                          Reply All
+                        </button>
+                        <button
+                          onClick={() => { setReplyTo(null); setComposeOpen(true); }}
+                          style={replyBtnStyle}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <path d="M8 3l3.5 3.5L8 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M11 6.5H4a3 3 0 00-3 3v1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          </svg>
+                          Forward
+                        </button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </>
