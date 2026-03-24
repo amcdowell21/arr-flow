@@ -1659,9 +1659,11 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
     }
   }
 
-  // ── Summary stats ──
-  const openDeals = deals.filter(d => !d.closedWon);
-  const closedDeals = deals.filter(d => d.closedWon);
+  // ── Summary stats (current calendar year only) ──
+  const currentYear = String(new Date().getFullYear());
+  const isCurrentYear = d => (d.expectedCloseMonth || "").startsWith(currentYear);
+  const openDeals = deals.filter(d => !d.closedWon && isCurrentYear(d));
+  const closedDeals = deals.filter(d => d.closedWon && isCurrentYear(d));
   const totalPipeline = openDeals.reduce((s, d) => s + (d.value || 0), 0);
   const totalAdjusted = openDeals.reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
   const totalClosedWon = closedDeals.reduce((s, d) => s + (d.value || 0), 0);
