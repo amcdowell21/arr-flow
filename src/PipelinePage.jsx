@@ -198,9 +198,9 @@ function getEffectiveConfidence(deal) {
 
 function getMonthOptions() {
   const opts = [];
-  const now = new Date();
-  for (let i = -2; i < 18; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+  const year = new Date().getFullYear();
+  for (let m = 0; m < 12; m++) {
+    const d = new Date(year, m, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
     opts.push({ value, label });
@@ -1104,7 +1104,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
     if (!monthGroups[key]) monthGroups[key] = [];
   }
 
-  const sortedMonths = Object.keys(monthGroups).sort();
+  const sortedMonths = Object.keys(monthGroups).filter(k => k.startsWith(String(currentYear))).sort();
   const maxAdj = Math.max(
     ...sortedMonths.map(m =>
       monthGroups[m].filter(d => !d.closedWon).reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0)
@@ -1678,8 +1678,9 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
     .filter(d => d.expectedCloseMonth === nextMonthKey)
     .reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
 
-  // ── Filtered deals (for month view) ──
+  // ── Filtered deals (for month view, current year only) ──
   const filteredDeals = deals.filter(d => {
+    if (!isCurrentYear(d)) return false;
     if (searchQuery.trim()) {
       if (!(d.name || "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
     }
@@ -1786,7 +1787,7 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
 
       {/* Dashboards tab */}
       {activeTab === "dashboards" && (
-        <PipelineDashboards deals={deals} />
+        <PipelineDashboards deals={deals.filter(d => (d.expectedCloseMonth || "").startsWith(currentYear))} />
       )}
 
       {/* Deals tab */}
