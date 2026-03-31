@@ -229,7 +229,7 @@ function fmtCreatedAt(ts) {
 
 
 // ─── DealRow ──────────────────────────────────────────────────────────────────
-function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
+function DealRow({ deal, onUpdate, onDelete, events = [], token, dealFollowUps = new Set(), meetingStageIds = new Set() }) {
   const [editing, setEditing] = useState(false);
   const [local, setLocal] = useState(deal);
   const [hsContacts, setHsContacts] = useState([]);
@@ -255,6 +255,11 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
   const adjustedValue = (local.value || 0) * (effective / 100);
   const confidenceColor = effective >= 70 ? "#4ade80" : effective >= 40 ? "#fbbf24" : "#f87171";
   const productMeta = getProductMeta(local.product);
+
+  // ── Deal action status ──
+  const hasMeetingBooked = local.meetingBooked || (local.hubspotStage && meetingStageIds.has(local.hubspotStage));
+  const hasFollowUp = dealFollowUps.has(`id:${deal.id}`) || (local.name && dealFollowUps.has(local.name.toLowerCase()));
+  const needsAction = !local.closedWon && !hasMeetingBooked && !hasFollowUp;
 
   function save() {
     onUpdate(deal.id, local);
@@ -618,6 +623,26 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token }) {
             <span style={{ fontSize: 10, background: "#3b0764", color: "#d8b4fe", borderRadius: 3, padding: "1px 5px", border: "1px solid #6d28d9" }}>Podcast</span>
           )}
         </div>
+        {/* ── Action status labels ── */}
+        {!local.closedWon && (
+          <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+            {hasMeetingBooked && (
+              <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(74,222,128,0.12)", color: "#4ade80", borderRadius: 3, padding: "1px 6px", border: "1px solid rgba(74,222,128,0.25)", letterSpacing: "0.02em" }}>
+                Meeting Booked
+              </span>
+            )}
+            {hasFollowUp && (
+              <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(99,102,241,0.12)", color: "#a5b4fc", borderRadius: 3, padding: "1px 6px", border: "1px solid rgba(99,102,241,0.25)", letterSpacing: "0.02em" }}>
+                Follow Up
+              </span>
+            )}
+            {needsAction && (
+              <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(251,191,36,0.12)", color: "#fbbf24", borderRadius: 3, padding: "1px 6px", border: "1px solid rgba(251,191,36,0.25)", letterSpacing: "0.02em" }}>
+                Needs Action
+              </span>
+            )}
+          </div>
+        )}
         {local.contactName && (
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{local.contactName}</div>
         )}
@@ -1182,7 +1207,7 @@ function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
               </thead>
               <tbody>
                 {sectionDeals.map(deal => (
-                  <DealRow key={deal.id} deal={deal} onUpdate={onUpdate} onDelete={onDelete} events={events} token={token} />
+                  <DealRow key={deal.id} deal={deal} onUpdate={onUpdate} onDelete={onDelete} events={events} token={token} dealFollowUps={dealFollowUps} meetingStageIds={meetingStageIds} />
                 ))}
               </tbody>
               <tfoot>
@@ -1436,7 +1461,7 @@ function OutboundActuals({ actuals, onAdd, onDelete }) {
 }
 
 // ─── Main Pipeline Page ───────────────────────────────────────────────────────
-export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealClosed }) {
+export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealClosed, currentUser }) {
   const [deals,        setDeals]        = useState([]);
   const [events,       setEvents]       = useState([]);
   const [actuals,      setActuals]      = useState([]);
@@ -1449,6 +1474,45 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
   const [activeTab,    setActiveTab]    = useState("dashboards");
   const [showCloseChart, setShowCloseChart] = useState(true);
   const [showAddedChart, setShowAddedChart] = useState(true);
+
+  // ── Follow-up data from Todos/Notes ──
+  const [dealFollowUps, setDealFollowUps] = useState(new Set()); // Set of deal names that have follow-ups
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const unsub = onSnapshot(doc(db, "userNotes", currentUser.uid), snap => {
+      if (!snap.exists()) { setDealFollowUps(new Set()); return; }
+      const data = snap.data();
+      const names = new Set();
+      // Check followUps calendar entries
+      const fups = data.followUps || {};
+      for (const key of Object.keys(fups)) {
+        const fu = fups[key];
+        if (fu.completed) continue;
+        if (fu.dealId) names.add(`id:${fu.dealId}`);
+        if (fu.dealName) names.add(fu.dealName.toLowerCase());
+      }
+      // Check todo blocks linked to deals
+      const blocks = data.blocks || [];
+      for (const b of blocks) {
+        if (b.type === "todo" && !b.checked && b.dealName) {
+          names.add(b.dealName.toLowerCase());
+        }
+      }
+      setDealFollowUps(names);
+    });
+    return unsub;
+  }, [currentUser?.uid]);
+
+  // Build set of HS stage IDs that count as "meeting booked"
+  const meetingStageIds = new Set();
+  (hsPipelines || []).forEach(p => {
+    (p.stages || []).forEach(s => {
+      if (/demo.scheduled|next.call|appointment.scheduled|presentation.scheduled/i.test(s.label || "")) {
+        meetingStageIds.add(s.id);
+      }
+    });
+  });
 
   // Firestore listeners
   useEffect(() => {

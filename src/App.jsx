@@ -1918,6 +1918,7 @@ export default function ARRFlow() {
       const history = demoStageId
         ? await fetchDealStageHistory(hsToken.trim(), deals.map(d => d.id))
         : {};
+      console.log("[HS Debug] demoStageId:", demoStageId, "history entries:", Object.keys(history).length, "sample:", Object.values(history).slice(0, 2));
       setHsDeals(deals);
       setHsPipelines(pipelines);
       setHsDemoStageId(demoStageId);
@@ -2094,7 +2095,7 @@ export default function ARRFlow() {
       {view === "hubspot" && <HubSpotPage hs={hs} />}
 
       {/* Pipeline page */}
-      {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} hsToken={hsToken} onHsDealClosed={handleHsDealClosed} />}
+      {view === "pipeline" && <PipelinePage hsDeals={hsDeals} hsPipelines={hsPipelines} hsToken={hsToken} onHsDealClosed={handleHsDealClosed} currentUser={currentUser} />}
 
       {/* Notes & Todos page (user-specific) */}
       {view === "todos" && <TodosPage currentUser={currentUser} initialNav={todosNav} onNavConsumed={() => setTodosNav(null)} />}
