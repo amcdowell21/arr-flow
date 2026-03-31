@@ -1102,7 +1102,7 @@ function AddDealModal({ onAdd, onClose, hsDeals, hsPipelines }) {
 }
 
 // ─── MonthByMonthDeals ────────────────────────────────────────────────────────
-function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token }) {
+function MonthByMonthDeals({ deals, onUpdate, onDelete, events = [], token, dealFollowUps = new Set(), meetingStageIds = new Set() }) {
   const [collapsed, setCollapsed] = useState({});
 
   const now = new Date();
@@ -2093,7 +2093,7 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
               </div>
             );
           })()}
-          <MonthByMonthDeals deals={filteredDeals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} token={hsToken} />
+          <MonthByMonthDeals deals={filteredDeals} onUpdate={updateDeal} onDelete={deleteDeal} events={events} token={hsToken} dealFollowUps={dealFollowUps} meetingStageIds={meetingStageIds} />
         </>
       )}
 
