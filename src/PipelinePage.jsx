@@ -393,6 +393,16 @@ function DealRow({ deal, onUpdate, onDelete, events = [], token, dealFollowUps =
                 />
               </div>
               <div>
+                <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>TAM ($)</label>
+                <input
+                  type="number"
+                  value={local.tam || ""}
+                  onChange={e => setLocal(p => ({ ...p, tam: parseFloat(e.target.value) || 0 }))}
+                  placeholder="Future potential"
+                  style={{ ...inp, width: 110 }}
+                />
+              </div>
+              <div>
                 <label style={{ fontSize: 11, color: "var(--text-label)", display: "block", marginBottom: 3 }}>Close Month</label>
                 <select
                   value={local.expectedCloseMonth || ""}
@@ -1731,6 +1741,7 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
   const totalPipeline = openDeals.reduce((s, d) => s + (d.value || 0), 0);
   const totalAdjusted = openDeals.reduce((s, d) => s + (d.value || 0) * (getEffectiveConfidence(d) / 100), 0);
   const totalClosedWon = closedDeals.reduce((s, d) => s + (d.value || 0), 0);
+  const totalTAM = deals.filter(d => !d.closedWon).reduce((s, d) => s + (d.tam || 0), 0);
   const now = new Date();
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const thisMonthAdj = openDeals
@@ -1815,6 +1826,7 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
           { label: "Confidence-Adjusted",  value: formatCurrency(totalAdjusted),   color: "#a5f3fc", sub: `${totalPipeline > 0 ? Math.round((totalAdjusted / totalPipeline) * 100) : 0}% of pipeline` },
           { label: "This Month",           value: thisMonthAdj > 0 ? formatCurrency(thisMonthAdj) : "—", color: "#818cf8", sub: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }) },
           { label: "Next Month",           value: nextMonthAdj > 0 ? formatCurrency(nextMonthAdj) : "—", color: "#fbbf24", sub: nextMonthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }) },
+          { label: "Total TAM",            value: totalTAM > 0 ? formatCurrency(totalTAM) : "—", color: "#c084fc", sub: `${deals.filter(d => !d.closedWon && d.tam > 0).length} deals with TAM` },
         ].map(card => (
           <div key={card.label} style={{ background: "var(--surface)", border: `1px solid ${card.border || "var(--border-strong)"}`, borderRadius: 10, padding: "14px 20px", flex: "1 1 140px", minWidth: 130 }}>
             <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>{card.label}</div>
