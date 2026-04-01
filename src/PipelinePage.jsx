@@ -1490,27 +1490,31 @@ export default function PipelinePage({ hsDeals, hsPipelines, hsToken, onHsDealCl
 
   useEffect(() => {
     if (!currentUser?.uid) return;
-    const unsub = onSnapshot(doc(db, "userNotes", currentUser.uid), snap => {
-      if (!snap.exists()) { setDealFollowUps(new Set()); return; }
-      const data = snap.data();
-      const names = new Set();
-      // Check followUps calendar entries
-      const fups = data.followUps || {};
-      for (const key of Object.keys(fups)) {
-        const fu = fups[key];
-        if (fu.completed) continue;
-        if (fu.dealId) names.add(`id:${fu.dealId}`);
-        if (fu.dealName) names.add(fu.dealName.toLowerCase());
-      }
-      // Check todo blocks linked to deals
-      const blocks = data.blocks || [];
-      for (const b of blocks) {
-        if (b.type === "todo" && !b.checked && b.dealName) {
-          names.add(b.dealName.toLowerCase());
-        }
-      }
-      setDealFollowUps(names);
-    });
+    const unsub = onSnapshot(
+      doc(db, "userNotes", currentUser.uid),
+      snap => {
+        try {
+          if (!snap.exists()) { setDealFollowUps(new Set()); return; }
+          const data = snap.data();
+          const names = new Set();
+          const fups = data.followUps || {};
+          for (const key of Object.keys(fups)) {
+            const fu = fups[key];
+            if (fu.completed) continue;
+            if (fu.dealId) names.add(`id:${fu.dealId}`);
+            if (fu.dealName) names.add(fu.dealName.toLowerCase());
+          }
+          const blocks = data.blocks || [];
+          for (const b of blocks) {
+            if (b.type === "todo" && !b.checked && b.dealName) {
+              names.add(b.dealName.toLowerCase());
+            }
+          }
+          setDealFollowUps(names);
+        } catch { setDealFollowUps(new Set()); }
+      },
+      () => setDealFollowUps(new Set()),
+    );
     return unsub;
   }, [currentUser?.uid]);
 
