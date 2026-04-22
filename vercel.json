@@ -4,5 +4,11 @@
       "source": "/api/eleven-webhook/:path*",
       "destination": "/api/eleven-webhook"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron-call-check",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }

@@ -100,6 +100,19 @@ service cloud.firestore {
       allow read, write: if isActiveUser();
     }
 
+    // Call prompts: one doc per post-call Slack DM. Writes happen server-side
+    // via Admin SDK; clients only need read access for a history view.
+    match /callPrompts/{id} {
+      allow read: if isActiveUser();
+      allow write: if false;
+    }
+
+    // Dedupe marker keyed on Google Calendar event ID. Server-side only.
+    match /processedCalendarEvents/{id} {
+      allow read: if isActiveUser();
+      allow write: if false;
+    }
+
     match /emailReminders/{id} {
       allow read: if isActiveUser();
       allow create: if isActiveUser() && request.resource.data.userId == request.auth.uid;
