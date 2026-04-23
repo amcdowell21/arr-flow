@@ -60,7 +60,12 @@ async function slack(method, payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!data.ok) console.error(`[slack] ${method} failed:`, data);
+  if (!data.ok) {
+    console.error(`[slack] ${method} failed:`, JSON.stringify(data));
+    console.error(`[slack] payload sent:`, JSON.stringify(payload));
+    const detail = data.response_metadata?.messages?.join("; ") || data.error;
+    throw new Error(`Slack ${method} failed: ${detail}`);
+  }
   return data;
 }
 
@@ -175,6 +180,24 @@ function modalNote(promptId) {
 }
 
 function modalPickDeal(promptId, candidates) {
+  if (!candidates || candidates.length === 0) {
+    return {
+      type: "modal",
+      callback_id: "submit_pick_deal_empty",
+      private_metadata: promptId,
+      title: { type: "plain_text", text: "Pick Deal" },
+      close: { type: "plain_text", text: "Close" },
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "No deals to pick from yet. Add some to the Pipeline Tracker first.",
+          },
+        },
+      ],
+    };
+  }
   const options = candidates.slice(0, 100).map(d => ({
     text: {
       type: "plain_text",
@@ -321,9 +344,24 @@ async function handleBlockAction(payload) {
     case "add_note":
       view = modalNote(promptId);
       break;
-    case "pick_deal":
-      view = modalPickDeal(promptId, prompt.candidateDeals || []);
+    case "pick_deal": {
+      let candidates = prompt.candidateDeals || [];
+      if (candidates.length === 0) {
+        // No auto-matches — fall back to the 100 most-recently-updated deals
+        // so there's always something to pick from.
+        const recent = await db.collection("pipelineDeals")
+          .orderBy("updatedAt", "desc")
+          .limit(100)
+          .get();
+        candidates = recent.docs.map(d => ({
+          id: d.id,
+          name: d.data().name || "(unnamed)",
+          value: d.data().value || 0,
+        }));
+      }
+      view = modalPickDeal(promptId, candidates);
       break;
+    }
     default:
       console.warn("[slack] unknown action:", action.action_id);
       return;
