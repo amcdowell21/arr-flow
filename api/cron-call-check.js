@@ -233,16 +233,23 @@ function buildInitialBlocks({ eventTitle, deal, candidates, promptId }) {
 }
 
 async function slackDm({ channel, text, blocks }) {
+  if (!channel) throw new Error("SLACK_USER_ID env var not set");
+  const payload = { channel, text, blocks, unfurl_links: false };
   const r = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
       "Content-Type": "application/json; charset=utf-8",
     },
-    body: JSON.stringify({ channel, text, blocks, unfurl_links: false }),
+    body: JSON.stringify(payload),
   });
   const data = await r.json();
-  if (!data.ok) throw new Error(`Slack postMessage failed: ${data.error}`);
+  if (!data.ok) {
+    console.error("[slackDm] full response:", JSON.stringify(data));
+    console.error("[slackDm] payload sent:", JSON.stringify(payload));
+    const detail = data.response_metadata?.messages?.join("; ") || data.error;
+    throw new Error(`Slack postMessage failed: ${detail}`);
+  }
   return data; // { ok, ts, channel, ... }
 }
 
