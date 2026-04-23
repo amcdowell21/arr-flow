@@ -210,9 +210,9 @@ function monthLabelFromIso(iso) {
   return d.toLocaleString("en-US", { month: "short", year: "numeric" });
 }
 
-function buildPromptBlocks(prompt, deal) {
+function buildPromptBlocks(prompt, deal, promptId) {
   const dealLine = deal
-    ? `*Deal:* ${deal.name} · $${Math.round((deal.value || 0) / 1000)}k · ${deal.confidence ?? "—"}% · close: ${monthLabelFromIso(deal.expectedCloseMonth)}`
+    ? `*Deal:* ${deal.name} · $${Math.round((deal.value || 0) / 1000)}k · ${deal.manualConfidence ?? deal.confidence ?? "—"}% · close: ${monthLabelFromIso(deal.expectedCloseMonth)}`
     : `*No deal matched* — pick one to update.`;
 
   const updates = prompt.updates || {};
@@ -239,36 +239,36 @@ function buildPromptBlocks(prompt, deal) {
   if (prompt.status === "skipped") {
     blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: "_Skipped._" }] });
   } else {
-    // Action buttons (swap first button for "Pick deal" if no match).
     const elements = [];
     if (!deal) {
       elements.push({
         type: "button",
         text: { type: "plain_text", text: "Pick deal" },
         action_id: "pick_deal",
+        value: promptId,
         style: "primary",
       });
     } else {
       elements.push(
-        { type: "button", text: { type: "plain_text", text: "Confidence" }, action_id: "update_confidence" },
-        { type: "button", text: { type: "plain_text", text: "Close month" }, action_id: "update_close_month" },
-        { type: "button", text: { type: "plain_text", text: "Value" }, action_id: "update_value" },
-        { type: "button", text: { type: "plain_text", text: "Add note" }, action_id: "add_note" },
+        { type: "button", text: { type: "plain_text", text: "Confidence" }, action_id: "update_confidence", value: promptId },
+        { type: "button", text: { type: "plain_text", text: "Close month" }, action_id: "update_close_month", value: promptId },
+        { type: "button", text: { type: "plain_text", text: "Value" }, action_id: "update_value", value: promptId },
+        { type: "button", text: { type: "plain_text", text: "Add note" }, action_id: "add_note", value: promptId },
       );
     }
-    elements.push({ type: "button", text: { type: "plain_text", text: "Skip" }, action_id: "skip" });
+    elements.push({ type: "button", text: { type: "plain_text", text: "Skip" }, action_id: "skip", value: promptId });
     blocks.push({ type: "actions", block_id: "deal_actions", elements });
   }
 
   return blocks;
 }
 
-async function refreshMessage(prompt) {
+async function refreshMessage(prompt, promptId) {
   const db = getDb();
   const deal = prompt.matchedDealId
     ? (await db.collection("pipelineDeals").doc(prompt.matchedDealId).get()).data()
     : null;
-  const blocks = buildPromptBlocks(prompt, deal ? { id: prompt.matchedDealId, ...deal } : null);
+  const blocks = buildPromptBlocks(prompt, deal ? { id: prompt.matchedDealId, ...deal } : null, promptId);
   await slack("chat.update", {
     channel: prompt.slackChannel,
     ts: prompt.slackMessageTs,
@@ -281,9 +281,9 @@ async function refreshMessage(prompt) {
 async function handleBlockAction(payload) {
   const action = payload.actions?.[0];
   if (!action) return;
-  const promptId = payload.message?.metadata?.event_payload?.promptId;
+  const promptId = action.value;
   if (!promptId) {
-    console.error("[slack] block_action with no promptId in metadata");
+    console.error("[slack] block_action with no promptId in button value");
     return;
   }
 
@@ -298,7 +298,7 @@ async function handleBlockAction(payload) {
       status: "skipped",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    await refreshMessage({ ...prompt, status: "skipped" });
+    await refreshMessage({ ...prompt, status: "skipped" }, promptId);
     return;
   }
 
@@ -403,7 +403,7 @@ async function handleViewSubmission(payload) {
 
   await promptRef.update(updates);
   const refreshed = (await promptRef.get()).data();
-  await refreshMessage(refreshed);
+  await refreshMessage(refreshed, promptId);
 
   return {}; // Empty body closes the modal.
 }

@@ -194,30 +194,34 @@ function monthLabelFromIso(iso) {
   return new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1).toLocaleString("en-US", { month: "short", year: "numeric" });
 }
 
-function buildInitialBlocks({ eventTitle, deal, candidates }) {
+function buildInitialBlocks({ eventTitle, deal, candidates, promptId }) {
   const dealLine = deal
     ? `*Deal:* ${deal.name} · $${Math.round((deal.value || 0) / 1000)}k · ${deal.manualConfidence ?? deal.confidence ?? "—"}% · close: ${monthLabelFromIso(deal.expectedCloseMonth)}`
     : candidates?.length
       ? `*${candidates.length} possible deals* — pick which one.`
       : `*No deal matched* — pick one or skip.`;
 
+  // promptId is stuffed into every button's `value` so the interactive handler
+  // can find the callPrompt doc without relying on Slack message metadata
+  // (which requires a separate app-level opt-in).
   const elements = [];
   if (!deal) {
     elements.push({
       type: "button",
       text: { type: "plain_text", text: "Pick deal" },
       action_id: "pick_deal",
+      value: promptId,
       style: "primary",
     });
   } else {
     elements.push(
-      { type: "button", text: { type: "plain_text", text: "Confidence" }, action_id: "update_confidence" },
-      { type: "button", text: { type: "plain_text", text: "Close month" }, action_id: "update_close_month" },
-      { type: "button", text: { type: "plain_text", text: "Value" }, action_id: "update_value" },
-      { type: "button", text: { type: "plain_text", text: "Add note" }, action_id: "add_note" },
+      { type: "button", text: { type: "plain_text", text: "Confidence" }, action_id: "update_confidence", value: promptId },
+      { type: "button", text: { type: "plain_text", text: "Close month" }, action_id: "update_close_month", value: promptId },
+      { type: "button", text: { type: "plain_text", text: "Value" }, action_id: "update_value", value: promptId },
+      { type: "button", text: { type: "plain_text", text: "Add note" }, action_id: "add_note", value: promptId },
     );
   }
-  elements.push({ type: "button", text: { type: "plain_text", text: "Skip" }, action_id: "skip" });
+  elements.push({ type: "button", text: { type: "plain_text", text: "Skip" }, action_id: "skip", value: promptId });
 
   return [
     {
@@ -228,14 +232,14 @@ function buildInitialBlocks({ eventTitle, deal, candidates }) {
   ];
 }
 
-async function slackDm({ channel, text, blocks, metadata }) {
+async function slackDm({ channel, text, blocks }) {
   const r = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
       "Content-Type": "application/json; charset=utf-8",
     },
-    body: JSON.stringify({ channel, text, blocks, metadata, unfurl_links: false }),
+    body: JSON.stringify({ channel, text, blocks, unfurl_links: false }),
   });
   const data = await r.json();
   if (!data.ok) throw new Error(`Slack postMessage failed: ${data.error}`);
@@ -287,13 +291,13 @@ async function processEvent(db, uid, userDoc, event) {
     eventTitle: event.summary || "(untitled meeting)",
     deal: primary,
     candidates,
+    promptId,
   });
 
   const slackRes = await slackDm({
     channel: process.env.SLACK_USER_ID,
     text: `Call ended: ${event.summary || "(untitled)"}`,
     blocks,
-    metadata: { event_type: "call_prompt", event_payload: { promptId } },
   });
 
   await promptRef.set({
