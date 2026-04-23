@@ -472,17 +472,18 @@ export default async function handler(req, res) {
 
   try {
     if (payload.type === "block_actions") {
-      // Ack immediately; Slack wants a 2xx within 3 s.
-      res.status(200).send("");
+      console.log("[slack-interactive] block_action:", payload.actions?.[0]?.action_id);
       await handleBlockAction(payload);
+      res.status(200).send("");
     } else if (payload.type === "view_submission") {
+      console.log("[slack-interactive] view_submission:", payload.view?.callback_id);
       const response = await handleViewSubmission(payload);
       res.status(200).json(response);
     } else {
       res.status(200).send("");
     }
   } catch (e) {
-    console.error("[slack-interactive] error:", e);
+    console.error("[slack-interactive] error:", e.message, e.stack);
     if (!res.writableEnded) res.status(500).send("Internal error");
   }
 }
