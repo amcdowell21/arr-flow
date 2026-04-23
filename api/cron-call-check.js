@@ -347,6 +347,7 @@ export default async function handler(req, res) {
         summary.push({ uid: doc.id, error: e.message });
       }
     }
+    console.log("[cron] summary:", JSON.stringify(summary));
     return res.status(200).json({ ok: true, summary });
   } catch (e) {
     console.error("[cron] fatal:", e);
